@@ -1,0 +1,136 @@
+# =========================
+# TERMINAL
+# =========================
+
+alacritty
+fastfetch
+btop
+eza
+micro
+nano
+wget
+curl
+git
+github-cli
+jq
+
+# =========================
+# WAYLAND / HYPRLAND
+# =========================
+
+hyprland
+hyprpicker
+hypridle
+hyprlock
+rofi-wayland
+grim
+slurp
+swappy
+wl-clipboard
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+xorg-xwayland
+
+# =========================
+# AUDIO
+# =========================
+
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+playerctl
+
+# =========================
+# FILE MANAGER
+# =========================
+
+dolphin
+gvfs
+
+# =========================
+# NOTIFICATION
+# =========================
+
+dunst
+libnotify
+
+# =========================
+# THEMES / FONTS
+# =========================
+
+adwaita-icon-theme
+gnome-themes-extra
+vimix-cursors
+ttf-font-awesome
+ttf-cascadia-code
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+
+# =========================
+# DEVELOPMENT
+# =========================
+
+base-devel
+neovim
+nodejs
+npm
+python
+python-pip
+clang
+
+# =========================
+# APPS
+# =========================
+
+discord
+thunderbird
+obs-studio
+qbittorrent
+scrcpy
+mpv
+proton-vpn-gtk-app
+
+# =========================
+# DISPLAY MANAGER
+# =========================
+
+sddm
+qt6-virtualkeyboard
+vivid
+
+# =========================
+# VIRTUALIZATION
+# =========================
+
+qemu-desktop
+libvirt
+virt-manager
+virt-viewer
+dnsmasq
+edk2-ovmf
+
+# =========================
+# SYSTEM
+# =========================
+
+brightnessctl
+cliphist
+gsettings-desktop-schemas
+polkit-kde-agent
+qt5-wayland
+qt6-wayland
+snapper
+zip
+unzip
+7zip
+ntfs-3g
+dosfstools
+exfatprogs
+xdg-user-dirs
+zsh
+zsh-autosuggestions
+zsh-completions
+zsh-syntax-highlighting

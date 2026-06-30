@@ -1,0 +1,87 @@
+# ==========================================
+#  ALACRITTY CONFIGURATION (Tokyo Night)
+# ==========================================
+
+[env]
+TERM = "xterm-256color"
+
+[window]
+padding = { x = 6, y = 6 }  # Slightly increased for better breathing room
+decorations = "None"
+opacity = 0.75              # Slightly raised for better readability on light wallpapers
+dynamic_title = true
+title = "Alacritty"
+
+[scrolling]
+history = 10000
+multiplier = 3
+
+[font]
+size = 13.5 # Slightly reduced to be proportional with padding
+
+[font.normal]
+family = "JetBrainsMono Nerd Font"
+style = "Regular"
+
+[font.bold]
+family = "JetBrainsMono Nerd Font"
+style = "Bold"
+
+[font.italic]
+family = "JetBrainsMono Nerd Font"
+style = "Italic"
+
+[cursor]
+style = { shape = "Beam", blinking = "On" }
+blink_interval = 750
+
+# ==========================================
+#  COLOR SCHEME: TOKYO NIGHT STORM (Modified)
+#  Aesthetic, clean, and high contrast
+# ==========================================
+
+[colors.primary]
+# Dark bluish background (not pure black) for an elegant feel
+background = "#1a1b26"
+# Off-white foreground (not pure white) to reduce eye strain
+foreground = "#c0caf5"
+
+[colors.cursor]
+text = "#1a1b26"
+cursor = "#c0caf5"
+
+# --- AUTOSUGGESTION COLOR FIX ---
+# Bright Black is typically used for shell autosuggestions.
+# Set to medium gray (#565f89) — visible on dark bg, readable on light transparent bg.
+
+[colors.normal]
+black   = "#15161e"
+red     = "#f7768e"  # Soft red (coral)
+green   = "#9ece6a"  # Matcha green
+yellow  = "#e0af68"  # Amber yellow
+blue    = "#7aa2f7"  # Sky blue
+magenta = "#bb9af7"  # Pastel purple
+cyan    = "#7dcfff"  # Ocean cyan
+white   = "#a9b1d6"  # Cloud white
+
+[colors.bright]
+black   = "#565f89"  # <--- KEY COLOR: makes autosuggestion history visible
+red     = "#ff9e64"  # Orange (red variant)
+green   = "#9ece6a"
+yellow  = "#e0af68"
+blue    = "#7aa2f7"
+magenta = "#bb9af7"
+cyan    = "#7dcfff"
+white   = "#c0caf5"
+
+# ==========================================
+#  KEY BINDINGS
+# ==========================================
+[keyboard]
+bindings = [
+    { key = "C", mods = "Control|Shift", action = "Copy" },
+    { key = "V", mods = "Control|Shift", action = "Paste" },
+    { key = "Plus",  mods = "Control", action = "IncreaseFontSize" },
+    { key = "Minus", mods = "Control", action = "DecreaseFontSize" },
+    { key = "Key0",  mods = "Control", action = "ResetFontSize" },
+]

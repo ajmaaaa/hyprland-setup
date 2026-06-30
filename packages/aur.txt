@@ -1,0 +1,48 @@
+# =========================
+# WAYLAND / WALLPAPER
+# =========================
+
+# swww — Animated wallpaper daemon untuk Hyprland
+swww
+
+# =========================
+# BROWSERS
+# =========================
+
+zen-browser-bin
+brave-bin
+librewolf-bin
+
+# =========================
+# OFFICE
+# =========================
+
+wps-office
+onlyoffice-bin
+
+# =========================
+# PRODUCTIVITY
+# =========================
+
+obsidian
+zotero-bin
+
+# =========================
+# COMMUNICATION
+# =========================
+
+zoom
+
+# =========================
+# DEVELOPMENT
+# =========================
+
+android-studio
+antigravity-ide
+
+
+# =========================
+# FONTS
+# =========================
+
+ttf-ms-fonts
