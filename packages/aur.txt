@@ -1,11 +1,4 @@
 # =========================
-# WAYLAND / WALLPAPER
-# =========================
-
-# swww — Animated wallpaper daemon untuk Hyprland
-swww
-
-# =========================
 # BROWSERS
 # =========================
 

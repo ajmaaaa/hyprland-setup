@@ -378,7 +378,7 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
       AUR_FAILED+=("$pkg")
     fi
   done
-  set -e
+  set +e # Disable exit-on-error for remaining non-critical setup steps to ensure config copying runs
 
   if [[ ${#AUR_FAILED[@]} -gt 0 ]]; then
     warn "The following AUR packages failed to install: ${AUR_FAILED[*]}"
@@ -394,9 +394,12 @@ info "Installing global npm packages..."
 NPM_PACKAGES=$(grep -vE '^\s*#|^\s*$' "$NPM_FILE")
 
 if [[ -n "$NPM_PACKAGES" ]]; then
-  sudo npm install -g $NPM_PACKAGES
+  if ! sudo npm install -g $NPM_PACKAGES; then
+    warn "Failed to install global npm packages."
+  else
+    success "Global npm packages installed."
+  fi
 fi
-success "Global npm packages installed."
 
 # =============================================================================
 # ENABLE SYSTEM SERVICES
@@ -405,8 +408,11 @@ success "Global npm packages installed."
 info "Enabling system services..."
 while read -r service; do
   [[ -z "$service" || "$service" =~ ^# ]] && continue
-  sudo systemctl enable --now "$service"
-  success "$service enabled."
+  if ! sudo systemctl enable --now "$service"; then
+    warn "Failed to enable service: $service"
+  else
+    success "$service enabled."
+  fi
 done < "$SERVICES_FILE"
 
 # Add user to libvirt/kvm groups if libvirtd is in the services list
@@ -426,6 +432,8 @@ info "Copying configuration files..."
 
 # Hyprland main config
 mkdir -p "$HOME/.config/hypr"
+# Remove legacy config to ensure Hyprland runs the new hyprland.lua config natively
+rm -f "$HOME/.config/hypr/hyprland.conf"
 if [[ -d "$SCRIPT_DIR/config/hypr" ]]; then
   cp -r "$SCRIPT_DIR/config/hypr/." "$HOME/.config/hypr/"
   success "Hyprland configuration copied."
@@ -614,8 +622,11 @@ echo -e "${GREEN}${BOLD}======================================================${
 echo -e "${GREEN}${BOLD}     HYPRLAND INSTALLATION COMPLETED SUCCESSFULLY!   ${RESET}"
 echo -e "${GREEN}${BOLD}======================================================${RESET}"
 echo ""
-echo -e "  ${YELLOW}The system will reboot in 5 seconds...${RESET}"
-echo -e "  ${YELLOW}Press Ctrl+C to cancel the reboot.${RESET}"
-echo ""
-sleep 5
-sudo reboot
+read -rp "  Do you want to reboot the system now? [Y/n]: " REBOOT_CHOICE
+REBOOT_CHOICE="${REBOOT_CHOICE:-Y}"
+if [[ "${REBOOT_CHOICE,,}" == "y" ]]; then
+  info "Rebooting..."
+  sudo reboot
+else
+  info "Please reboot your system manually to apply all changes."
+fi
