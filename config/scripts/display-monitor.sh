@@ -3,12 +3,11 @@
 # █▀▄ █ █▀ █▀█ █░░ ▄▀█ █▄█
 # █▄▀ █ ▄█ █▀▀ █▄▄ █▀█ ░█░
 # ============================================================
-# Adaptasi dari sway display-monitor.sh → pakai hyprctl
+# Adaptasi dari sway display-monitor.sh → pakai hyprctl & Rofi Applet
 
 # --- CONFIGURATION ---
 LAPTOP="eDP-1"
 EXTERNAL="HDMI-A-1"
-ROFI_CMD="rofi -dmenu -i -p 'Display Mode' -theme-str 'window {width: 20%;}'"
 
 NOTIF_ID="1005"
 TIMEOUT="3000"
@@ -50,8 +49,90 @@ apply_mode() {
     esac
 }
 
-# --- MENU ---
-options="💻 Laptop Only\n📽️ Projector Only\n🖥️ Extend (Dual)\n🪞 Mirror (Clone)"
-choice=$(echo -e "$options" | eval "$ROFI_CMD")
+# --- ROFI APPLET CONFIGURATION ---
+if [ -f "$HOME/.config/rofi/applets/shared/theme.bash" ]; then
+    source "$HOME"/.config/rofi/applets/shared/theme.bash
+    theme="$type/$style"
+fi
 
-apply_mode "$choice"
+# Theme Elements
+prompt="Display Mode"
+mesg="Select a display configuration"
+
+if [ -n "$theme" ] && [ -f "$theme" ]; then
+    if [[ "$theme" == *'type-1'* ]]; then
+        list_col='1'
+        list_row='4'
+        win_width='400px'
+    elif [[ "$theme" == *'type-3'* ]]; then
+        list_col='1'
+        list_row='4'
+        win_width='120px'
+    elif [[ "$theme" == *'type-5'* ]]; then
+        list_col='1'
+        list_row='4'
+        win_width='425px'
+    elif [[ ( "$theme" == *'type-2'* ) || ( "$theme" == *'type-4'* ) ]]; then
+        list_col='4'
+        list_row='1'
+        win_width='550px'
+    fi
+
+    # Options
+    layout=$(cat "${theme}" | grep 'USE_ICON' | cut -d'=' -f2)
+    if [[ "$layout" == 'NO' ]]; then
+        option_1="💻 Laptop Only"
+        option_2="📽️ Projector Only"
+        option_3="🖥️ Extend (Dual)"
+        option_4="🪞 Mirror (Clone)"
+    else
+        option_1="💻"
+        option_2="📽️"
+        option_3="🖥️"
+        option_4="🪞"
+    fi
+
+    rofi_cmd() {
+        rofi -theme-str "window {width: $win_width;}" \
+            -theme-str "listview {columns: $list_col; lines: $list_row;}" \
+            -theme-str 'textbox-prompt-colon {str: "🖥️";}' \
+            -dmenu \
+            -p "$prompt" \
+            -mesg "$mesg" \
+            -markup-rows \
+            -theme "${theme}"
+    }
+else
+    # Fallback if theme doesn't exist
+    option_1="💻 Laptop Only"
+    option_2="📽️ Projector Only"
+    option_3="🖥️ Extend (Dual)"
+    option_4="🪞 Mirror (Clone)"
+    
+    rofi_cmd() {
+        rofi -dmenu -i -p 'Display Mode' -theme-str 'window {width: 25%;}'
+    }
+fi
+
+# Pass options to rofi dmenu
+run_rofi() {
+    echo -e "$option_1\n$option_2\n$option_3\n$option_4" | rofi_cmd
+}
+
+choice="$(run_rofi)"
+
+# --- EXECUTION ---
+case "$choice" in
+    *"Laptop Only"*|*"💻"*)
+        apply_mode "💻 Laptop Only"
+        ;;
+    *"Projector Only"*|*"📽️"*)
+        apply_mode "📽️ Projector Only"
+        ;;
+    *"Extend"*|*"🖥️"*)
+        apply_mode "🖥️ Extend (Dual)"
+        ;;
+    *"Mirror"*|*"🪞"*)
+        apply_mode "🪞 Mirror (Clone)"
+        ;;
+esac

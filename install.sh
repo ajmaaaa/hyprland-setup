@@ -541,7 +541,8 @@ chmod +x setup.sh
 cd "$SCRIPT_DIR"
 rm -rf "$TMPDIR"
 
-ln -sf ~/.config/rofi/launchers/type-1/launcher.sh ~/.config/rofi/launcher_active.sh
+ln -sf ~/.config/rofi/launchers/type-6/launcher.sh ~/.config/rofi/launcher_active.sh
+sed -i "s/theme=.*/theme='style-7'/g" ~/.config/rofi/launchers/type-6/launcher.sh
 ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_active.sh
 success "Rofi themes installed and symlinked."
 

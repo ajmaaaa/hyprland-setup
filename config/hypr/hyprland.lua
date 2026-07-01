@@ -73,9 +73,9 @@ hl.config({
     general = {
         gaps_in = 6,
         gaps_out = 6, -- Uniform outer gaps
-        border_size = 2,
+        border_size = 1,
         col = {
-            active_border = "rgba(4c7899ff)",   -- Sway blue active border
+            active_border = "rgba(ffffffff)",   -- Celestial white active border
             inactive_border = "rgba(333333ff)", -- Sway grey inactive border
         },
         layout = "dwindle",
@@ -143,6 +143,8 @@ hl.config({
         animate_manual_resizes = true,
         enable_swallow = true,
         swallow_regex = "^(alacritty)$",
+        key_press_enables_dpms = true,
+        mouse_move_enables_dpms = false,
     },
 })
 
