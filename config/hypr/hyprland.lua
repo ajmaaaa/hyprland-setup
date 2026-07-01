@@ -166,13 +166,14 @@ hl.env("XCURSOR_SIZE", "30")
 
 hl.on("hyprland.start", function ()
     hl.exec_cmd("pkill dunst; dunst")
-    -- hl.exec_cmd("swww-daemon")
+    hl.exec_cmd("swww-daemon")
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("sleep 1 && /usr/lib/xdg-desktop-portal-hyprland &")
     hl.exec_cmd("sleep 2 && /usr/lib/xdg-desktop-portal &")
+    hl.exec_cmd("~/.config/hypr/scripts/toggle-theme.sh restore")
 end)
 
 -- ------------------------------------------------------------
