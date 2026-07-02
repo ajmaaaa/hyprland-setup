@@ -156,7 +156,7 @@ show_checklist() {
     warn "Selection cancelled for '$title'. Falling back to all recommended packages."
     # Fallback: load all packages from file
     mapfile -t result_ref < <(grep -vE '^\s*#|^\s*$' "$file")
-    return 1
+    return 0
   fi
 
   # Parse dialog output: space-separated, possibly quoted
@@ -408,7 +408,7 @@ fi
 info "Enabling system services..."
 while read -r service; do
   [[ -z "$service" || "$service" =~ ^# ]] && continue
-  if ! sudo systemctl enable --now "$service"; then
+  if ! sudo systemctl enable "$service"; then
     warn "Failed to enable service: $service"
   else
     success "$service enabled."
