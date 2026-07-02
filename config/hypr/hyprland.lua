@@ -117,9 +117,11 @@ hl.curve("linear",    { type = "bezier", points = { {0.0, 0.0}, {1.0, 1.0} } })
 
 -- Animations Config
 hl.animation({ leaf = "windows",     enabled = false })
+hl.animation({ leaf = "windowsIn",   enabled = false })
 hl.animation({ leaf = "windowsOut",  enabled = false })
 hl.animation({ leaf = "windowsMove", enabled = true, speed = 3,  bezier = "smoothIn" })
 hl.animation({ leaf = "fade",        enabled = false })
+hl.animation({ leaf = "fadeIn",      enabled = false })
 hl.animation({ leaf = "fadeOut",     enabled = false })
 hl.animation({ leaf = "border",      enabled = true, speed = 3,  bezier = "linear" })
 hl.animation({ leaf = "workspaces",  enabled = true, speed = 3,  bezier = "overshot",  style = "slide" })
@@ -175,6 +177,8 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("sleep 1 && /usr/lib/xdg-desktop-portal-hyprland &")
     hl.exec_cmd("sleep 2 && /usr/lib/xdg-desktop-portal &")
     hl.exec_cmd("~/.config/hypr/scripts/toggle-theme.sh restore")
+    -- Auto-switch to nearest occupied workspace when current becomes empty
+    hl.exec_cmd("~/.config/hypr/scripts/workspace-autoclean.sh")
 end)
 
 -- ------------------------------------------------------------

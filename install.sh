@@ -804,22 +804,59 @@ EOF
   fi
 
   # 5. Configure Loader Timeout & Plymouth parameters (quiet splash)
+  # Auto-detect whether /boot (ESP) requires sudo to access.
+  # Some systems mount it with fmask=0077,dmask=0077 (only root can access),
+  # while others allow normal user read access. Handle both cases.
+  BOOT_NEEDS_SUDO=false
+  for boot_path in "/boot" "/efi" "/boot/efi"; do
+    if [[ -d "$boot_path" ]] 2>/dev/null; then
+      # /boot exists and is accessible without sudo
+      break
+    elif sudo test -d "$boot_path" 2>/dev/null; then
+      # /boot exists but requires sudo to access
+      BOOT_NEEDS_SUDO=true
+      info "ESP at $boot_path requires elevated access (fmask=0077). Using sudo for boot configuration."
+      break
+    fi
+  done
+
+  # Helper: run a command with sudo only if /boot requires it
+  boot_run() {
+    if [[ "$BOOT_NEEDS_SUDO" == true ]]; then
+      sudo "$@"
+    else
+      "$@"
+    fi
+  }
+
   # For systemd-boot config (timeout)
   for loader_conf in "/boot/loader/loader.conf" "/efi/loader/loader.conf" "/boot/efi/loader/loader.conf"; do
-    if [[ -f "$loader_conf" ]]; then
+    if boot_run test -f "$loader_conf"; then
       info "Found systemd-boot config at $loader_conf. Setting timeout to 0..."
-      sudo sed -i 's/^timeout.*/timeout 0/' "$loader_conf"
+      # Replace existing timeout line, or append if missing
+      if boot_run grep -q '^timeout' "$loader_conf"; then
+        sudo sed -i 's/^timeout.*/timeout 0/' "$loader_conf"
+      else
+        echo "timeout 0" | sudo tee -a "$loader_conf" > /dev/null
+      fi
+      # Set console-mode to auto for cleaner boot
+      if boot_run grep -q '^console-mode' "$loader_conf"; then
+        sudo sed -i 's/^console-mode.*/console-mode auto/' "$loader_conf"
+      else
+        echo "console-mode auto" | sudo tee -a "$loader_conf" > /dev/null
+      fi
+      success "systemd-boot timeout set to 0 at $loader_conf"
     fi
   done
 
   # For systemd-boot entries (quiet splash)
   for entry_dir in "/boot/loader/entries" "/efi/loader/entries" "/boot/efi/loader/entries"; do
-    if [[ -d "$entry_dir" ]]; then
+    if boot_run test -d "$entry_dir"; then
       info "Found systemd-boot entries directory at $entry_dir. Adjusting entries for Plymouth..."
-      find "$entry_dir" -type f -name "*.conf" | while read -r entry_file; do
-        if grep -q "^options " "$entry_file"; then
+      boot_run find "$entry_dir" -type f -name "*.conf" | while read -r entry_file; do
+        if boot_run grep -q "^options " "$entry_file"; then
           local options_line
-          options_line=$(grep "^options " "$entry_file")
+          options_line=$(boot_run grep "^options " "$entry_file")
           [[ ! "$options_line" =~ "quiet" ]] && options_line="$options_line quiet"
           [[ ! "$options_line" =~ "splash" ]] && options_line="$options_line splash"
           [[ ! "$options_line" =~ "loglevel=3" ]] && options_line="$options_line loglevel=3"
