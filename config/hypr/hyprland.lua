@@ -83,13 +83,15 @@ hl.config({
         rounding = 8,
         blur = {
             enabled = true,
-            size = 8,
-            passes = 2,
+            size = 4,
+            passes = 1,
             new_optimizations = true,
-            xray = false,
+            xray = true,
             noise = 0.02,
             contrast = 0.9,
             brightness = 0.8,
+            popups = false,
+            popups_ignorealpha = 0.2,
         },
         shadow = {
             enabled = true,
@@ -99,11 +101,11 @@ hl.config({
             color_inactive = 0x661a1a2e,
         },
         active_opacity = 1.0,
-        inactive_opacity = 0.95,
+        inactive_opacity = 1.0,
         fullscreen_opacity = 1.0,
     },
     animations = {
-        enabled = false,
+        enabled = true,
     },
 })
 
@@ -114,13 +116,13 @@ hl.curve("overshot",  { type = "bezier", points = { {0.05, 0.9}, {0.1, 1.05} } }
 hl.curve("linear",    { type = "bezier", points = { {0.0, 0.0}, {1.0, 1.0} } })
 
 -- Animations Config
-hl.animation({ leaf = "windows",     enabled = false, speed = 5,  bezier = "overshot",  style = "slide" })
-hl.animation({ leaf = "windowsOut",  enabled = false, speed = 4,  bezier = "smoothOut", style = "slide" })
-hl.animation({ leaf = "windowsMove", enabled = false, speed = 4,  bezier = "smoothIn" })
-hl.animation({ leaf = "fade",        enabled = false, speed = 5,  bezier = "smoothIn" })
-hl.animation({ leaf = "fadeOut",     enabled = false, speed = 4,  bezier = "smoothOut" })
-hl.animation({ leaf = "border",      enabled = false, speed = 10, bezier = "linear" })
-hl.animation({ leaf = "workspaces",  enabled = false, speed = 5,  bezier = "overshot",  style = "slidevert" })
+hl.animation({ leaf = "windows",     enabled = false })
+hl.animation({ leaf = "windowsOut",  enabled = false })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 3,  bezier = "smoothIn" })
+hl.animation({ leaf = "fade",        enabled = false })
+hl.animation({ leaf = "fadeOut",     enabled = false })
+hl.animation({ leaf = "border",      enabled = true, speed = 3,  bezier = "linear" })
+hl.animation({ leaf = "workspaces",  enabled = true, speed = 3,  bezier = "overshot",  style = "slide" })
 
 -- ------------------------------------------------------------
 --  LAYOUTS & MISC
@@ -139,7 +141,7 @@ hl.config({
         disable_hyprland_logo = true,
         disable_splash_rendering = true,
         background_color = 0x000000,
-        animate_manual_resizes = true,
+        animate_manual_resizes = false,
         enable_swallow = true,
         swallow_regex = "^(alacritty)$",
         key_press_enables_dpms = true,
@@ -206,6 +208,9 @@ hl.window_rule({ match = { class = "^(pavucontrol)$" }, float = true })
 hl.window_rule({ match = { class = "^(blueman-manager)$" }, float = true })
 hl.window_rule({ match = { class = "^(nm-connection-editor)$" }, float = true })
 hl.window_rule({ match = { class = "^(polkit-kde-authentication-agent-1)$" }, float = true })
+
+-- ProtonVPN (disable blur & shadow for smooth dragging)
+hl.window_rule({ match = { class = "^(proton\\.vpn\\.app\\.gtk)$" }, float = true, no_blur = true, no_shadow = true, opaque = true })
 
 -- Opacities
 hl.window_rule({ match = { class = "^(alacritty)$" }, opacity = "0.75 0.70" })
