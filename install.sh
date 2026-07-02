@@ -166,34 +166,28 @@ show_checklist() {
   return 0
 }
 
-# Full interactive package selection flow (pacman + AUR)
-select_packages_interactively() {
-  ensure_dialog
-  show_checklist "Pacman Packages" "$PACMAN_FILE" FINAL_PACMAN_PACKAGES
-  show_checklist "AUR Packages"    "$AUR_FILE"    FINAL_AUR_PACKAGES
-}
-
-# --- PROMPT USER ---
+# --- PROMPT USER FOR PACMAN PACKAGES ---
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BLUE}║          PACKAGE INSTALLATION OPTIONS                ║${RESET}"
+echo -e "${BLUE}║          PACMAN PACKAGE INSTALLATION OPTIONS         ║${RESET}"
 echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${RESET}"
-echo -e "${BLUE}║  ${GREEN}[Y]${RESET}  Install with all recommended packages          ${BLUE}║${RESET}"
-echo -e "${BLUE}║  ${YELLOW}[N]${RESET}  Choose packages interactively (checklist)      ${BLUE}║${RESET}"
+echo -e "${BLUE}║  ${GREEN}[Y]${RESET}  Install all recommended Pacman packages       ${BLUE}║${RESET}"
+echo -e "${BLUE}║  ${YELLOW}[N]${RESET}  Choose Pacman packages interactively          ${BLUE}║${RESET}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
 echo ""
-read -rp "  Proceed with all recommended packages? [Y/n]: " INSTALL_ALL
-INSTALL_ALL="${INSTALL_ALL:-Y}"
+read -rp "  Proceed with all recommended Pacman packages? [Y/n]: " INSTALL_ALL_PACMAN
+INSTALL_ALL_PACMAN="${INSTALL_ALL_PACMAN:-Y}"
 
 # Initialize arrays with all recommended packages (default)
 mapfile -t FINAL_PACMAN_PACKAGES < <(grep -vE '^\s*#|^\s*$' "$PACMAN_FILE")
 mapfile -t FINAL_AUR_PACKAGES    < <(grep -vE '^\s*#|^\s*$' "$AUR_FILE")
 
-if [[ "${INSTALL_ALL,,}" == "n" ]]; then
-  select_packages_interactively
+if [[ "${INSTALL_ALL_PACMAN,,}" == "n" ]]; then
+  ensure_dialog
+  show_checklist "Pacman Packages" "$PACMAN_FILE" FINAL_PACMAN_PACKAGES
 fi
 
-info "Installing ${#FINAL_PACMAN_PACKAGES[@]} pacman packages and ${#FINAL_AUR_PACKAGES[@]} AUR packages."
+info "Installing ${#FINAL_PACMAN_PACKAGES[@]} pacman packages."
 
 # =============================================================================
 # CONFIGURE PACMAN FOR BETTER DOWNLOAD RELIABILITY
@@ -342,7 +336,54 @@ import_missing_pgp_key() {
   return 1
 }
 
-info "Installing AUR packages..."
+# --- PROMPT USER FOR AUR PACKAGES ---
+echo -e "\n${BLUE}======================================================${RESET}"
+echo -e "${BLUE}          AUR PACKAGES LIST                           ${RESET}"
+echo -e "${BLUE}======================================================${RESET}"
+# Parse aur.txt to display categories and packages nicely
+while IFS= read -r line; do
+  # Skip empty lines
+  [[ -z "${line// }" ]] && continue
+  # Skip separator lines
+  [[ "$line" =~ ^[[:space:]]*#[[:space:]]*[=\-]+[[:space:]]*$ ]] && continue
+  # Category header
+  if [[ "$line" =~ ^[[:space:]]*#[[:space:]]+([A-Za-z][A-Za-z0-9\ /\&\.\-]+)[[:space:]]*$ ]]; then
+    echo -e "${YELLOW}  Category: ${BASH_REMATCH[1]}${RESET}"
+  elif [[ ! "$line" =~ ^[[:space:]]*# ]]; then
+    pkg="$(echo "$line" | tr -d '[:space:]')"
+    [[ -n "$pkg" ]] && echo -e "    • $pkg"
+  fi
+done < "$AUR_FILE"
+echo -e "${BLUE}======================================================${RESET}\n"
+
+echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BLUE}║          AUR PACKAGE INSTALLATION OPTIONS            ║${RESET}"
+echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${RESET}"
+echo -e "${BLUE}║  ${GREEN}[Y]${RESET}  Install all listed AUR packages               ${BLUE}║${RESET}"
+echo -e "${BLUE}║  ${YELLOW}[N]${RESET}  Choose AUR packages interactively (checklist)  ${BLUE}║${RESET}"
+echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+echo ""
+read -rp "  Proceed with all recommended AUR packages? [Y/n]: " INSTALL_ALL_AUR
+INSTALL_ALL_AUR="${INSTALL_ALL_AUR:-Y}"
+
+if [[ "${INSTALL_ALL_AUR,,}" == "n" ]]; then
+  ensure_dialog
+  show_checklist "AUR Packages" "$AUR_FILE" FINAL_AUR_PACKAGES
+fi
+
+# Print beautiful installation header
+echo -e "\n${BLUE}======================================================${RESET}"
+echo -e "${BLUE}          STARTING AUR PACKAGES INSTALLATION          ${RESET}"
+echo -e "${BLUE}======================================================${RESET}"
+if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
+  echo -e "Installing the following AUR packages:"
+  for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
+    echo -e "  • ${GREEN}$pkg${RESET}"
+  done
+  echo ""
+else
+  echo -e "${YELLOW}No AUR packages selected for installation.${RESET}\n"
+fi
 
 AUR_MAX_RETRY=3
 
@@ -350,10 +391,11 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   set +e
   AUR_FAILED=()
   # Attempt to install all AUR packages in one command (batch)
+  info "Running batch installation via yay..."
   if ! yay -S --noconfirm --needed --answerdiff None --answerclean None --pgpfetch "${FINAL_AUR_PACKAGES[@]}"; then
     warn "Batch AUR installation failed. Retrying packages individually..."
     for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
-      info "Installing: $pkg"
+      echo -e "${BLUE}[AUR]${RESET} Installing: ${YELLOW}$pkg${RESET}..."
       PKG_INSTALLED=false
 
       for attempt in $(seq 1 $AUR_MAX_RETRY); do
@@ -385,6 +427,8 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
         AUR_FAILED+=("$pkg")
       fi
     done
+  else
+    success "Batch AUR package installation completed successfully."
   fi
   set +e # Disable exit-on-error for remaining non-critical setup steps to ensure config copying runs
 

@@ -17,7 +17,6 @@ local term     = "alacritty"
 local menu     = "rofi -show drun"
 local browser1 = "zen-browser"
 local browser2 = "brave"
-local browser3 = "librewolf"
 local files    = "dolphin"
 
 -- ------------------------------------------------------------
@@ -226,7 +225,6 @@ hl.bind(mainMod .. " + Space", hl.dsp.exec_cmd("~/.config/hypr/scripts/rofi-laun
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(files))
 hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd(browser1))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser2))
-hl.bind(mainMod .. " + X", hl.dsp.exec_cmd(browser3))
 hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("antigravity-ide"))
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd(term .. " -e nvim"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("protonvpn-app"))
