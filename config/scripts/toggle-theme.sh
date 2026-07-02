@@ -41,7 +41,9 @@ set_light() {
     update_gtk_file "$GTK_THEME_LIGHT" 0
 
     echo "light" > "$STATE_FILE"
-    notify-send -r 1001 -t 2000 -i weather-clear "System Theme" "Light Mode Active"
+    if [ "$SILENT" != "true" ]; then
+        notify-send -r 1001 -t 2000 -i weather-clear "System Theme" "Light Mode Active"
+    fi
 }
 
 # --- DARK MODE ---
@@ -59,11 +61,14 @@ set_dark() {
     update_gtk_file "$GTK_THEME_DARK" 1
 
     echo "dark" > "$STATE_FILE"
-    notify-send -r 1001 -t 2000 -i weather-clear-night "System Theme" "Dark Mode Active"
+    if [ "$SILENT" != "true" ]; then
+        notify-send -r 1001 -t 2000 -i weather-clear-night "System Theme" "Dark Mode Active"
+    fi
 }
 
 # --- EXECUTION ---
 if [ "$1" == "restore" ]; then
+    SILENT="true"
     if [ -f "$STATE_FILE" ]; then
         CURRENT=$(cat "$STATE_FILE")
         [ "$CURRENT" == "dark" ] && set_dark || set_light

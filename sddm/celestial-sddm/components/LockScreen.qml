@@ -18,7 +18,9 @@ Item {
             font.weight: Config.clockFontWeight
             font.family: Config.clockFontFamily
             color: Config.clockColor
+            Layout.fillWidth: true
             Layout.alignment: Config.clockAlign === "left" ? Qt.AlignLeft : (Config.clockAlign === "right" ? Qt.AlignRight : Qt.AlignHCenter)
+            horizontalAlignment: Config.clockAlign === "left" ? Text.AlignLeft : (Config.clockAlign === "right" ? Text.AlignRight : Text.AlignHCenter)
 
             function updateTime() {
                 text = new Date().toLocaleString(Qt.locale(Config.dateLocale), Config.clockFormat);
@@ -27,7 +29,9 @@ Item {
 
         Text {
             id: date
+            Layout.fillWidth: true
             Layout.alignment: Config.clockAlign === "left" ? Qt.AlignLeft : (Config.clockAlign === "right" ? Qt.AlignRight : Qt.AlignHCenter)
+            horizontalAlignment: Config.clockAlign === "left" ? Text.AlignLeft : (Config.clockAlign === "right" ? Text.AlignRight : Text.AlignHCenter)
             visible: Config.dateDisplay
             font.pixelSize: Config.dateFontSize * Config.generalScale
             font.family: Config.dateFontFamily
