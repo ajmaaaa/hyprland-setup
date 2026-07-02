@@ -553,10 +553,23 @@ rm -rf "$TMPDIR"
 ln -sf ~/.config/rofi/launchers/type-6/launcher.sh ~/.config/rofi/launcher_active.sh
 sed -i "s/theme=.*/theme='style-7'/g" ~/.config/rofi/launchers/type-6/launcher.sh
 ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_active.sh
-  # Patch Rofi powermenu to use instant-off, lock, and suspend for screen locking under Hyprland
-  sed -i "s|betterlockscreen -l|hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })' \&\& loginctl lock-session \&\& systemctl suspend|g" ~/.config/rofi/powermenu/type-1/powermenu.sh
-  sed -i 's/betterlockscreen/hyprlock/g' ~/.config/rofi/powermenu/type-1/powermenu.sh
-  success "Rofi themes installed and symlinked."
+  # Patch Rofi powermenus to use instant-off, lock, suspend, and logout for Hyprland
+  for powermenu in ~/.config/rofi/powermenu/type-*/powermenu.sh; do
+    if [[ -f "$powermenu" ]]; then
+      sed -i "s|betterlockscreen -l|hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })' \&\& loginctl lock-session \&\& systemctl suspend|g" "$powermenu"
+      sed -i 's/betterlockscreen/hyprlock/g' "$powermenu"
+      # Use uname -n instead of hostname command which might be missing
+      sed -i 's/`hostname`/$(uname -n)/g' "$powermenu"
+      # Patch logout for Hyprland if not already present
+      if ! grep -q "hl.dsp.exit()" "$powermenu"; then
+        sed -i 's/openbox --exit/openbox --exit\n\t\t\telif [[ "$DESKTOP_SESSION" == '\''hyprland'\'' || "$DESKTOP_SESSION" == '\''Hyprland'\'' || -n "$HYPRLAND_INSTANCE_SIGNATURE" ]]; then\n\t\t\t\thyprctl dispatch '\''hl.dsp.exit()'\''/g' "$powermenu"
+      fi
+    fi
+  done
+  if [[ -f ~/.config/rofi/applets/bin/powermenu.sh ]]; then
+    sed -i 's/`hostname`/$(uname -n)/g' ~/.config/rofi/applets/bin/powermenu.sh
+  fi
+  success "Rofi themes installed, symlinked, and patched for Hyprland."
 
 # =============================================================================
 # POWERLEVEL10K & ZSH

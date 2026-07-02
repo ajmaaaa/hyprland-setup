@@ -32,6 +32,8 @@ Item {
             Layout.fillWidth: true
             Layout.alignment: Config.clockAlign === "left" ? Qt.AlignLeft : (Config.clockAlign === "right" ? Qt.AlignRight : Qt.AlignHCenter)
             horizontalAlignment: Config.clockAlign === "left" ? Text.AlignLeft : (Config.clockAlign === "right" ? Text.AlignRight : Text.AlignHCenter)
+            Layout.leftMargin: Config.clockAlign === "left" ? (Config.dateMarginLeft * Config.generalScale) : 0
+            Layout.rightMargin: Config.clockAlign === "right" ? (Config.dateMarginRight * Config.generalScale) : 0
             visible: Config.dateDisplay
             font.pixelSize: Config.dateFontSize * Config.generalScale
             font.family: Config.dateFontFamily

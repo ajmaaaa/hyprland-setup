@@ -9,6 +9,12 @@ Item {
     id: root
     state: Config.lockScreenDisplay ? "lockState" : "loginState"
 
+    FontLoader { source: "fonts/redhat/RedHatDisplay-Regular.otf" }
+    FontLoader { source: "fonts/redhat/RedHatDisplay-Medium.otf" }
+    FontLoader { source: "fonts/redhat/RedHatDisplay-SemiBold.otf" }
+    FontLoader { source: "fonts/redhat/RedHatDisplay-Bold.otf" }
+    FontLoader { source: "fonts/redhat/RedHatDisplay-Black.otf" }
+
     // TODO: Add own translations: https://github.com/sddm/sddm/wiki/Localization
     TextConstants {
         id: textConstants
