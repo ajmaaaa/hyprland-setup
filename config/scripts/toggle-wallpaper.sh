@@ -3,7 +3,7 @@
 # █░█░█ ▄▀█ █░░ █░░ █▀█ ▄▀█ █▀█ █▀▀ █▀█
 # ▀▄▀▄▀ █▀█ █▄▄ █▄▄ █▀▀ █▀█ █▀▀ ██▄ █▀▄
 # ============================================================
-# Adaptasi dari sway toggle-wallpaper.sh → pakai swww
+# Adapted from sway toggle-wallpaper.sh → use swww
 
 # --- CONFIG ---
 WALL_A="$HOME/Pictures/"

@@ -1,0 +1,37 @@
+// Set background to solid black
+Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+// Load the Arch Linux logo image (flat white with transparent background)
+logo_image = Image("logo.png");
+logo_sprite = Sprite(logo_image);
+
+// Start with opacity 1.0 (fully visible, no fade-in)
+logo_sprite.SetOpacity(1.0);
+
+// Animation refresh callback (just centering statically)
+fun refresh_callback () {
+    // Center the logo sprite on screen (recalculated dynamically)
+    screen_width = Window.GetWidth();
+    screen_height = Window.GetHeight();
+    logo_x = (screen_width / 2) - (logo_image.GetWidth() / 2);
+    logo_y = (screen_height / 2) - (logo_image.GetHeight() / 2);
+    logo_sprite.SetPosition(logo_x, logo_y, 10);
+    logo_sprite.SetOpacity(1.0);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+// LUKS password prompt integration
+fun display_password_callback (prompt, bullets) {
+    // Keep logo visible but stop breathing if password prompt appears
+    logo_sprite.SetOpacity(1.0);
+}
+
+fun display_normal_callback () {
+    // Resume standard boot appearance
+    logo_sprite.SetOpacity(1.0);
+}
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetDisplayNormalFunction(display_normal_callback);

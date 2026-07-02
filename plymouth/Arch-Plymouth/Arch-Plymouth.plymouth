@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Arch-Plymouth
+Description=A modern minimalist, cinematic boot splash for Arch Linux with a breathing white logo
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/Arch-Plymouth
+ScriptFile=/usr/share/plymouth/themes/Arch-Plymouth/Arch-Plymouth.script

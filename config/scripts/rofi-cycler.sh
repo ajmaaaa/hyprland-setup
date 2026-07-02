@@ -3,7 +3,7 @@
 # █▀█ █▀█ █▀▀ █
 # █▀▄ █▄█ █▀░ █
 # ==========================================
-#  ROFI THEME CYCLER — identik dengan sway
+#  ROFI THEME CYCLER — identical to sway
 # ==========================================
 
 MODE=$1    # launcher / powermenu

@@ -111,6 +111,7 @@ virt-manager
 virt-viewer
 dnsmasq
 edk2-ovmf
+dmidecode
 
 # =========================
 # SYSTEM

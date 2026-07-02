@@ -3,7 +3,7 @@
 # █▀▄ █ █▀ █▀█ █░░ ▄▀█ █▄█
 # █▄▀ █ ▄█ █▀▀ █▄▄ █▀█ ░█░
 # ============================================================
-# Adaptasi dari sway display-monitor.sh → pakai hyprctl & Rofi Applet
+# Adapted from sway display-monitor.sh → use hyprctl & Rofi Applet
 
 # --- CONFIGURATION ---
 LAPTOP="eDP-1"
@@ -38,7 +38,7 @@ apply_mode() {
             send_notif "Mode: Extended Display"
             ;;
         "🪞 Mirror (Clone)")
-            # Hyprland mirror = sama posisi dengan mirror_of
+            # Hyprland mirror = same position as mirror_of
             hyprctl keyword monitor "$LAPTOP, 1920x1080, 0x0, 1"
             hyprctl keyword monitor "$EXTERNAL, 1920x1080, 0x0, 1, mirror, $LAPTOP"
             send_notif "Mode: Mirror / Clone"

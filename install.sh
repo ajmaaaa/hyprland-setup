@@ -227,16 +227,20 @@ info "Installing pacman packages..."
 if [[ ${#FINAL_PACMAN_PACKAGES[@]} -gt 0 ]]; then
   set +e
   PACMAN_FAILED=()
-  for pkg in "${FINAL_PACMAN_PACKAGES[@]}"; do
-    if ! sudo pacman -S --needed --noconfirm "$pkg"; then
-      warn "Failed to install '$pkg' — retrying once..."
-      sleep 3
+  # Attempt to install all pacman packages in one command (batch)
+  if ! sudo pacman -S --needed --noconfirm "${FINAL_PACMAN_PACKAGES[@]}"; then
+    warn "Batch pacman installation failed. Retrying packages individually..."
+    for pkg in "${FINAL_PACMAN_PACKAGES[@]}"; do
       if ! sudo pacman -S --needed --noconfirm "$pkg"; then
-        warn "Skipping '$pkg' after retry failure."
-        PACMAN_FAILED+=("$pkg")
+        warn "Failed to install '$pkg' — retrying once..."
+        sleep 3
+        if ! sudo pacman -S --needed --noconfirm "$pkg"; then
+          warn "Skipping '$pkg' after retry failure."
+          PACMAN_FAILED+=("$pkg")
+        fi
       fi
-    fi
-  done
+    done
+  fi
   set -e
   if [[ ${#PACMAN_FAILED[@]} -gt 0 ]]; then
     warn "The following pacman packages failed: ${PACMAN_FAILED[*]}"
@@ -345,39 +349,43 @@ AUR_MAX_RETRY=3
 if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   set +e
   AUR_FAILED=()
-  for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
-    info "Installing: $pkg"
-    PKG_INSTALLED=false
+  # Attempt to install all AUR packages in one command (batch)
+  if ! yay -S --noconfirm --needed --answerdiff None --answerclean None --pgpfetch "${FINAL_AUR_PACKAGES[@]}"; then
+    warn "Batch AUR installation failed. Retrying packages individually..."
+    for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
+      info "Installing: $pkg"
+      PKG_INSTALLED=false
 
-    for attempt in $(seq 1 $AUR_MAX_RETRY); do
-      install_output=$(yay -S --noconfirm --needed --answerdiff None --answerclean None --pgpfetch "$pkg" 2>&1)
-      install_status=$?
+      for attempt in $(seq 1 $AUR_MAX_RETRY); do
+        install_output=$(yay -S --noconfirm --needed --answerdiff None --answerclean None --pgpfetch "$pkg" 2>&1)
+        install_status=$?
 
-      if [[ $install_status -eq 0 ]]; then
-        success "$pkg installed successfully."
-        PKG_INSTALLED=true
-        break
-      fi
+        if [[ $install_status -eq 0 ]]; then
+          success "$pkg installed successfully."
+          PKG_INSTALLED=true
+          break
+        fi
 
-      warn "Attempt $attempt/$AUR_MAX_RETRY failed for $pkg."
+        warn "Attempt $attempt/$AUR_MAX_RETRY failed for $pkg."
 
-      # Handle PGP/GPG key issues before retrying
-      if echo "$install_output" | grep -qiE "pgp|gpg|signature|key|FAILED"; then
-        warn "PGP issue detected — attempting key import..."
-        import_missing_pgp_key "$install_output"
-      fi
+        # Handle PGP/GPG key issues before retrying
+        if echo "$install_output" | grep -qiE "pgp|gpg|signature|key|FAILED"; then
+          warn "PGP issue detected — attempting key import..."
+          import_missing_pgp_key "$install_output"
+        fi
 
-      if [[ $attempt -lt $AUR_MAX_RETRY ]]; then
-        warn "Retrying $pkg in 5 seconds..."
-        sleep 5
+        if [[ $attempt -lt $AUR_MAX_RETRY ]]; then
+          warn "Retrying $pkg in 5 seconds..."
+          sleep 5
+        fi
+      done
+
+      if [[ "$PKG_INSTALLED" == false ]]; then
+        warn "Skipping $pkg after $AUR_MAX_RETRY failed attempts."
+        AUR_FAILED+=("$pkg")
       fi
     done
-
-    if [[ "$PKG_INSTALLED" == false ]]; then
-      warn "Skipping $pkg after $AUR_MAX_RETRY failed attempts."
-      AUR_FAILED+=("$pkg")
-    fi
-  done
+  fi
   set +e # Disable exit-on-error for remaining non-critical setup steps to ensure config copying runs
 
   if [[ ${#AUR_FAILED[@]} -gt 0 ]]; then
@@ -545,7 +553,10 @@ rm -rf "$TMPDIR"
 ln -sf ~/.config/rofi/launchers/type-6/launcher.sh ~/.config/rofi/launcher_active.sh
 sed -i "s/theme=.*/theme='style-7'/g" ~/.config/rofi/launchers/type-6/launcher.sh
 ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_active.sh
-success "Rofi themes installed and symlinked."
+  # Patch Rofi powermenu to use instant-off, lock, and suspend for screen locking under Hyprland
+  sed -i "s|betterlockscreen -l|hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })' \&\& loginctl lock-session \&\& systemctl suspend|g" ~/.config/rofi/powermenu/type-1/powermenu.sh
+  sed -i 's/betterlockscreen/hyprlock/g' ~/.config/rofi/powermenu/type-1/powermenu.sh
+  success "Rofi themes installed and symlinked."
 
 # =============================================================================
 # POWERLEVEL10K & ZSH
@@ -622,31 +633,92 @@ fi
 configure_bootloader_and_plymouth() {
   info "Configuring bootloader and Plymouth..."
 
-  # 1. Plymouth configuration
+  # 1. Install custom theme
+  if [[ -d "$SCRIPT_DIR/plymouth/Arch-Plymouth" ]]; then
+    info "Installing Arch-Plymouth theme..."
+    sudo mkdir -p /usr/share/plymouth/themes/Arch-Plymouth
+    sudo cp -r "$SCRIPT_DIR/plymouth/Arch-Plymouth/." /usr/share/plymouth/themes/Arch-Plymouth/
+    success "Arch-Plymouth theme installed."
+  else
+    warn "Custom Arch-Plymouth theme directory not found. Skipping theme install."
+  fi
+
+  # 2. Plymouth configuration
   info "Configuring /etc/plymouth/plymouthd.conf..."
   sudo mkdir -p /etc/plymouth
   sudo tee /etc/plymouth/plymouthd.conf > /dev/null << 'EOF'
 [Daemon]
-Theme=spinner
+Theme=Arch-Plymouth
 ShowDelay=0
 DeviceTimeout=8
+UseFirmwareBackground=false
 EOF
   success "Plymouth configuration written."
 
-  # 2. Add plymouth to mkinitcpio hooks if present
+  # Set default theme using plymouth tool
+  if command -v plymouth-set-default-theme &>/dev/null; then
+    info "Setting default theme to Arch-Plymouth..."
+    sudo plymouth-set-default-theme Arch-Plymouth || true
+  fi
+
+  # Disable systemd-stub splash in mkinitcpio preset to prevent duplicate boot screens
+  if [[ -f "/etc/mkinitcpio.d/linux.preset" ]]; then
+    info "Disabling systemd-stub splash screen in mkinitcpio preset..."
+    sudo sed -i 's/--splash [^"]*//g' /etc/mkinitcpio.d/linux.preset
+    success "Systemd-stub splash disabled."
+  fi
+
+  # 3. Configure Loader options for UKI systems (via /etc/kernel/cmdline)
+  if [[ -f "/etc/kernel/cmdline" ]]; then
+    info "Found UKI configuration at /etc/kernel/cmdline. Applying silent boot parameters..."
+    sudo sed -i 's/\b\(quiet\|splash\|loglevel=3\|systemd.show_status=[a-z]*\|rd.systemd.show_status=[a-z]*\|rd.udev.log_level=3\|udev.log_priority=3\|vt.global_cursor_default=0\|bgrt_disable\)\b//g' /etc/kernel/cmdline
+    sudo sed -i 's/ *$/ quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false rd.udev.log_level=3 udev.log_priority=3 vt.global_cursor_default=0 bgrt_disable/' /etc/kernel/cmdline
+    success "Updated /etc/kernel/cmdline"
+  fi
+
+  # 4. Add plymouth to mkinitcpio hooks & configure Early KMS if present
   if [[ -f "/etc/mkinitcpio.conf" ]]; then
-    info "Configuring mkinitcpio for plymouth..."
+    info "Configuring mkinitcpio..."
+
+    # Detect GPU and add matching module for Early KMS (hybrid-compatible)
+    local gpu_drivers=()
+    if lspci | grep -iq "intel"; then
+      gpu_drivers+=("i915")
+    fi
+    if lspci | grep -iq "amd"; then
+      gpu_drivers+=("amdgpu")
+    fi
+    if lspci | grep -iq "nvidia"; then
+      gpu_drivers+=("nvidia" "nvidia_modeset" "nvidia_uvm" "nvidia_drm")
+    fi
+
+    if [[ ${#gpu_drivers[@]} -gt 0 ]]; then
+      info "Detected GPU(s). Configuring Early KMS modules (${gpu_drivers[*]}) in mkinitcpio..."
+      for mod in "${gpu_drivers[@]}"; do
+        if ! grep -q "^MODULES=.*$mod" /etc/mkinitcpio.conf; then
+          sudo sed -i "s/\(MODULES=(\)/\1$mod /" /etc/mkinitcpio.conf
+        fi
+      done
+      success "Configured Early KMS modules."
+    fi
+
+    # Add plymouth hook at the correct place (after kms if present, else after udev)
     if ! grep -q "^HOOKS=.*plymouth" /etc/mkinitcpio.conf; then
-      sudo sed -i 's/\(udev\)/\1 plymouth/' /etc/mkinitcpio.conf
+      if grep -q "^HOOKS=.*kms" /etc/mkinitcpio.conf; then
+        sudo sed -i 's/\(kms\)/\1 plymouth/' /etc/mkinitcpio.conf
+      else
+        sudo sed -i 's/\(udev\)/\1 plymouth/' /etc/mkinitcpio.conf
+      fi
       success "Added plymouth hook to /etc/mkinitcpio.conf"
     else
       info "plymouth hook already present in /etc/mkinitcpio.conf"
     fi
+
     info "Regenerating initramfs..."
     sudo mkinitcpio -P || true
   fi
 
-  # 3. Configure Loader Timeout & Plymouth parameters (quiet splash)
+  # 5. Configure Loader Timeout & Plymouth parameters (quiet splash)
   # For systemd-boot config (timeout)
   for loader_conf in "/boot/loader/loader.conf" "/efi/loader/loader.conf" "/boot/efi/loader/loader.conf"; do
     if [[ -f "$loader_conf" ]]; then
@@ -665,6 +737,17 @@ EOF
           options_line=$(grep "^options " "$entry_file")
           [[ ! "$options_line" =~ "quiet" ]] && options_line="$options_line quiet"
           [[ ! "$options_line" =~ "splash" ]] && options_line="$options_line splash"
+          [[ ! "$options_line" =~ "loglevel=3" ]] && options_line="$options_line loglevel=3"
+          if [[ "$options_line" =~ "systemd.show_status=auto" ]]; then
+            options_line=${options_line//systemd.show_status=auto/systemd.show_status=false}
+          elif [[ ! "$options_line" =~ "systemd.show_status=false" ]]; then
+            options_line="$options_line systemd.show_status=false"
+          fi
+          [[ ! "$options_line" =~ "rd.systemd.show_status=false" ]] && options_line="$options_line rd.systemd.show_status=false"
+          [[ ! "$options_line" =~ "rd.udev.log_level=3" ]] && options_line="$options_line rd.udev.log_level=3"
+          [[ ! "$options_line" =~ "udev.log_priority=3" ]] && options_line="$options_line udev.log_priority=3"
+          [[ ! "$options_line" =~ "vt.global_cursor_default=0" ]] && options_line="$options_line vt.global_cursor_default=0"
+          [[ ! "$options_line" =~ "bgrt_disable" ]] && options_line="$options_line bgrt_disable"
           sudo sed -i "s|^options .*|$options_line|" "$entry_file"
           success "Updated systemd-boot entry: $(basename "$entry_file")"
         fi
