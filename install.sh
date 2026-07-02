@@ -138,7 +138,13 @@ show_checklist() {
   # Build checklist items: ("pkg" "[CATEGORY]" "on") ...
   local ITEMS=()
   while IFS='|' read -r pkg category; do
-    ITEMS+=("$pkg" "[$category]" "on")
+    local status="on"
+    local disp_category="[$category]"
+    if [[ -n "${INSTALLED_PKGS[$pkg]}" ]]; then
+      status="off"
+      disp_category="[Installed] $category"
+    fi
+    ITEMS+=("$pkg" "$disp_category" "$status")
   done < <(parse_packages "$file")
 
   dialog \
@@ -156,7 +162,7 @@ show_checklist() {
     warn "Selection cancelled for '$title'. Falling back to all recommended packages."
     # Fallback: load all packages from file
     mapfile -t result_ref < <(grep -vE '^\s*#|^\s*$' "$file")
-    return 0
+    return 1
   fi
 
   # Parse dialog output: space-separated, possibly quoted
@@ -165,6 +171,14 @@ show_checklist() {
   clear
   return 0
 }
+
+# Load all installed packages into a map for fast lookup
+declare -A INSTALLED_PKGS
+if command -v pacman &>/dev/null; then
+  while read -r pkg; do
+    INSTALLED_PKGS["$pkg"]=1
+  done < <(pacman -Qq)
+fi
 
 # --- PROMPT USER FOR PACMAN PACKAGES ---
 echo ""
@@ -182,9 +196,12 @@ INSTALL_ALL_PACMAN="${INSTALL_ALL_PACMAN:-Y}"
 mapfile -t FINAL_PACMAN_PACKAGES < <(grep -vE '^\s*#|^\s*$' "$PACMAN_FILE")
 mapfile -t FINAL_AUR_PACKAGES    < <(grep -vE '^\s*#|^\s*$' "$AUR_FILE")
 
+PACMAN_INTERACTIVE=false
 if [[ "${INSTALL_ALL_PACMAN,,}" == "n" ]]; then
   ensure_dialog
-  show_checklist "Pacman Packages" "$PACMAN_FILE" FINAL_PACMAN_PACKAGES
+  if show_checklist "Pacman Packages" "$PACMAN_FILE" FINAL_PACMAN_PACKAGES; then
+    PACMAN_INTERACTIVE=true
+  fi
 fi
 
 info "Installing ${#FINAL_PACMAN_PACKAGES[@]} pacman packages."
@@ -221,14 +238,18 @@ info "Installing pacman packages..."
 if [[ ${#FINAL_PACMAN_PACKAGES[@]} -gt 0 ]]; then
   set +e
   PACMAN_FAILED=()
+  local needed_flag="--needed"
+  if [[ "$PACMAN_INTERACTIVE" == "true" ]]; then
+    needed_flag=""
+  fi
   # Attempt to install all pacman packages in one command (batch)
-  if ! sudo pacman -S --needed --noconfirm "${FINAL_PACMAN_PACKAGES[@]}"; then
+  if ! sudo pacman -S $needed_flag --noconfirm "${FINAL_PACMAN_PACKAGES[@]}"; then
     warn "Batch pacman installation failed. Retrying packages individually..."
     for pkg in "${FINAL_PACMAN_PACKAGES[@]}"; do
-      if ! sudo pacman -S --needed --noconfirm "$pkg"; then
+      if ! sudo pacman -S $needed_flag --noconfirm "$pkg"; then
         warn "Failed to install '$pkg' — retrying once..."
         sleep 3
-        if ! sudo pacman -S --needed --noconfirm "$pkg"; then
+        if ! sudo pacman -S $needed_flag --noconfirm "$pkg"; then
           warn "Skipping '$pkg' after retry failure."
           PACMAN_FAILED+=("$pkg")
         fi
@@ -366,9 +387,12 @@ echo ""
 read -rp "  Proceed with all recommended AUR packages? [Y/n]: " INSTALL_ALL_AUR
 INSTALL_ALL_AUR="${INSTALL_ALL_AUR:-Y}"
 
+AUR_INTERACTIVE=false
 if [[ "${INSTALL_ALL_AUR,,}" == "n" ]]; then
   ensure_dialog
-  show_checklist "AUR Packages" "$AUR_FILE" FINAL_AUR_PACKAGES
+  if show_checklist "AUR Packages" "$AUR_FILE" FINAL_AUR_PACKAGES; then
+    AUR_INTERACTIVE=true
+  fi
 fi
 
 # Print beautiful installation header
@@ -390,16 +414,20 @@ AUR_MAX_RETRY=3
 if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   set +e
   AUR_FAILED=()
+  local aur_needed_flag="--needed"
+  if [[ "$AUR_INTERACTIVE" == "true" ]]; then
+    aur_needed_flag=""
+  fi
   # Attempt to install all AUR packages in one command (batch)
   info "Running batch installation via yay..."
-  if ! yay -S --noconfirm --needed --answerdiff None --answerclean None --pgpfetch "${FINAL_AUR_PACKAGES[@]}"; then
+  if ! yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch "${FINAL_AUR_PACKAGES[@]}"; then
     warn "Batch AUR installation failed. Retrying packages individually..."
     for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
       echo -e "${BLUE}[AUR]${RESET} Installing: ${YELLOW}$pkg${RESET}..."
       PKG_INSTALLED=false
 
       for attempt in $(seq 1 $AUR_MAX_RETRY); do
-        install_output=$(yay -S --noconfirm --needed --answerdiff None --answerclean None --pgpfetch "$pkg" 2>&1)
+        install_output=$(yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch "$pkg" 2>&1)
         install_status=$?
 
         if [[ $install_status -eq 0 ]]; then
