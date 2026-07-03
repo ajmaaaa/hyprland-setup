@@ -13,6 +13,7 @@ curl
 git
 github-cli
 jq
+tree
 
 # =========================
 # WAYLAND / HYPRLAND
