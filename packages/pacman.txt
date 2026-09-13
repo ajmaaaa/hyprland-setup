@@ -20,6 +20,7 @@ tree
 # =========================
 
 hyprland
+quickshell
 hyprpicker
 hypridle
 hyprlock
@@ -92,6 +93,8 @@ obs-studio
 qbittorrent
 scrcpy
 mpv
+papers
+loupe
 proton-vpn-gtk-app
 
 # =========================
@@ -132,9 +135,11 @@ ntfs-3g
 dosfstools
 exfatprogs
 xdg-user-dirs
+xdg-utils
+desktop-file-utils
+shared-mime-info
 zsh
 zsh-autosuggestions
 zsh-completions
 zsh-syntax-highlighting
 plymouth
-

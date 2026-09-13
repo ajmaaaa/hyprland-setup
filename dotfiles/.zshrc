@@ -39,6 +39,7 @@ alias grep='grep --color=auto'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias cls='clear'
+alias status='fastfetch -l arch2'
 # Pacman
 alias pac='sudo pacman -S'
 alias pacu='sudo pacman -Syu'

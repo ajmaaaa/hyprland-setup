@@ -238,7 +238,7 @@ info "Installing pacman packages..."
 if [[ ${#FINAL_PACMAN_PACKAGES[@]} -gt 0 ]]; then
   set +e
   PACMAN_FAILED=()
-  local needed_flag="--needed"
+  needed_flag="--needed"
   if [[ "$PACMAN_INTERACTIVE" == "true" ]]; then
     needed_flag=""
   fi
@@ -414,7 +414,7 @@ AUR_MAX_RETRY=3
 if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   set +e
   AUR_FAILED=()
-  local aur_needed_flag="--needed"
+  aur_needed_flag="--needed"
   if [[ "$AUR_INTERACTIVE" == "true" ]]; then
     aur_needed_flag=""
   fi
@@ -526,6 +526,30 @@ if [[ -d "$SCRIPT_DIR/config/scripts" ]]; then
   cp -r "$SCRIPT_DIR/config/scripts/." "$HOME/.config/hypr/scripts/"
   chmod +x "$HOME"/.config/hypr/scripts/*.sh 2>/dev/null || true
   success "Hyprland scripts copied and made executable."
+fi
+
+# Workspace preview (only copy this shell, preserving other Quickshell configs)
+PREVIEW_TARGET="$HOME/.config/quickshell/workspace-preview"
+if [[ -d "$PREVIEW_TARGET" ]]; then
+  cp -a "$PREVIEW_TARGET" "${PREVIEW_TARGET}.backup-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$PREVIEW_TARGET"
+cp "$SCRIPT_DIR/config/quickshell/workspace-preview/"{shell.qml,start.sh,README.md} "$PREVIEW_TARGET/"
+chmod +x "$PREVIEW_TARGET/start.sh"
+if command -v quickshell &>/dev/null; then
+  success "Workspace preview configured (starts with Hyprland)."
+else
+  warn "Workspace preview requires quickshell; install it if it was deselected."
+fi
+
+# Default viewers and Open With entries; skip applications that were not installed.
+if ! python3 "$SCRIPT_DIR/scripts/setup-viewers.py"; then
+  warn "Viewer setup failed. Rerun: python3 $SCRIPT_DIR/scripts/setup-viewers.py"
+fi
+if command -v obs &>/dev/null; then
+  if ! python3 "$SCRIPT_DIR/scripts/setup-obs.py"; then
+    warn "OBS preset setup failed. Rerun: python3 $SCRIPT_DIR/scripts/setup-obs.py"
+  fi
 fi
 
 # Alacritty
