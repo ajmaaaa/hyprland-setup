@@ -8,6 +8,7 @@ ShellRoot {
     id: root
     property bool shown: false
     property bool ready: false
+    property int requestedWorkspace: -1
     readonly property var monitor: Hyprland.focusedMonitor
     readonly property var workspace: monitor ? monitor.activeWorkspace : null
     readonly property int activeId: workspace ? workspace.id : -1
@@ -22,7 +23,28 @@ ShellRoot {
         shown = true;
         dismiss.restart();
     }
-    onActiveIdChanged: show()
+    function hide() {
+        shown = false;
+        dismiss.stop();
+    }
+    function cycle(direction, lua) {
+        if (!ready || activeIndex < 0 || workspaceIds.length === 0) return;
+        const nextIndex = (activeIndex + direction + workspaceIds.length) % workspaceIds.length;
+        requestedWorkspace = workspaceIds[nextIndex];
+        if (requestedWorkspace === activeId) {
+            requestedWorkspace = -1;
+            show();
+        } else {
+            Hyprland.dispatch(lua
+                ? "hl.dsp.focus({ workspace = " + requestedWorkspace + " })"
+                : "workspace " + requestedWorkspace);
+        }
+    }
+    onActiveIdChanged: {
+        if (activeId === requestedWorkspace) show();
+        else hide();
+        requestedWorkspace = -1;
+    }
     Component.onCompleted: ready = true
 
     Timer {
@@ -40,7 +62,9 @@ ShellRoot {
     IpcHandler {
         target: "preview"
         function reveal(): void { root.show(); }
-        function hide(): void { root.shown = false; dismiss.stop(); }
+        function next(lua: bool): void { root.cycle(1, lua); }
+        function previous(lua: bool): void { root.cycle(-1, lua); }
+        function hide(): void { root.requestedWorkspace = -1; root.hide(); }
         function status(): string {
             return JSON.stringify({ shown: root.shown, workspace: root.activeId,
                 workspaces: root.workspaceIds, monitor: root.monitor ? root.monitor.name : "" });

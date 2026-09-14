@@ -209,6 +209,7 @@ hl.window_rule({ match = { title = "^(Choose wallpaper)(.*)$" }, float = true })
 hl.window_rule({ match = { title = "^(Save File)(.*)$" }, float = true })
 
 -- Popups
+hl.window_rule({ match = { class = "^(local\\.hyprland\\.Connections|hypr-connections)$" }, float = true, center = true })
 hl.window_rule({ match = { class = "^(pavucontrol)$" }, float = true })
 hl.window_rule({ match = { class = "^(blueman-manager)$" }, float = true })
 hl.window_rule({ match = { class = "^(nm-connection-editor)$" }, float = true })
@@ -239,6 +240,7 @@ hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("antigravity-ide"))
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd(term .. " -e nvim"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("protonvpn-app"))
 hl.bind(mainMod .. " + P", hl.dsp.exec_cmd("~/.config/hypr/scripts/display-monitor.sh"))
+hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("~/.config/hypr/scripts/connections.sh"))
 
 -- System Controls
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprctl reload"))
@@ -300,6 +302,8 @@ hl.bind(mainMod .. " + minus",       hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.window.move({ workspace = "special:magic" }))
 
 -- Workspaces
+hl.bind("ALT + Tab", hl.dsp.exec_cmd("quickshell ipc -p ~/.config/quickshell/workspace-preview call preview next true"))
+hl.bind("ALT + SHIFT + Tab", hl.dsp.exec_cmd("quickshell ipc -p ~/.config/quickshell/workspace-preview call preview previous true"))
 for i = 1, 10 do
     local key = i % 10
     hl.bind(mainMod .. " + " .. key,         hl.dsp.focus({ workspace = i }))

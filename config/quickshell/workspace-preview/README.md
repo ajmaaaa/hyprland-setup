@@ -4,10 +4,12 @@ Requires Quickshell 0.3.1 and Hyprland toplevel export. Run `start.sh` from the
 Hyprland session; the installer configures automatic startup. Duplicate starts
 are ignored.
 
+- Alt+Tab cycles existing workspaces on the focused monitor and shows the preview;
+  Alt+Shift+Tab cycles in reverse. Mod+number and other workspace changes hide it.
 - Active workspace in the middle, nearest existing workspace above/below.
 - Right-aligned cards, smaller neighbors, lower preview dimmed by 16%.
 - Labels overlay the lower left with no background or status dot.
-- Slide animation, automatic dismissal 1 second after a workspace change.
+- Slide animation, automatic dismissal 1 second after Alt+Tab/Alt+Shift+Tab.
 - Real window captures at native source resolution, mipmapped for downscaling.
 - Captures refresh at up to 8 FPS while visible and are released when hidden.
 - No keyboard focus or mouse interception.

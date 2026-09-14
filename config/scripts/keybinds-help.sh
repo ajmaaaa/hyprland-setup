@@ -27,6 +27,7 @@ gen_list() {
     echo "<b>  Power Menu</b>               <span alpha='60%'>| Mod + Shift + e</span>"
     echo "<b>  VPN (Proton)</b>             <span alpha='60%'>| Mod + v</span>"
     echo "<b>📽️ Projector/Monitor</b>        <span alpha='60%'>| Mod + p</span>"
+    echo "<b> Wi-Fi / Bluetooth</b>        <span alpha='60%'>| Mod + i</span>"
     echo "<b>  Screenshot Menu</b>          <span alpha='60%'>| Mod + Shift + s</span>"
     echo "<b>  Screenshot (Region)</b>      <span alpha='60%'>| PrintScreen</span>"
     echo "<b>  Screenshot (Full)</b>        <span alpha='60%'>| Shift + PrintScreen</span>"

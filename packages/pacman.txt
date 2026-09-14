@@ -44,6 +44,19 @@ wireplumber
 playerctl
 
 # =========================
+# CONNECTIONS
+# =========================
+
+networkmanager
+iw
+python-gobject
+gtk3
+nm-connection-editor
+bluez
+bluez-utils
+blueman
+
+# =========================
 # FILE MANAGER
 # =========================
 
@@ -92,10 +105,12 @@ thunderbird
 obs-studio
 qbittorrent
 scrcpy
+android-tools
 mpv
 papers
 loupe
 proton-vpn-gtk-app
+proton-vpn-cli
 
 # =========================
 # DISPLAY MANAGER

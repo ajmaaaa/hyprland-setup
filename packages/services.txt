@@ -1,2 +1,4 @@
 sddm.service
 libvirtd.service
+NetworkManager.service
+bluetooth.service

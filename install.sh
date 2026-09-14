@@ -649,6 +649,7 @@ rm -rf "$TMPDIR"
 ln -sf ~/.config/rofi/launchers/type-6/launcher.sh ~/.config/rofi/launcher_active.sh
 sed -i "s/theme=.*/theme='style-7'/g" ~/.config/rofi/launchers/type-6/launcher.sh
 ln -sf ~/.config/rofi/powermenu/type-1/powermenu.sh ~/.config/rofi/powermenu_active.sh
+cp "$SCRIPT_DIR/config/rofi/connections.rasi" "$HOME/.config/rofi/connections.rasi"
   # Patch Rofi powermenus to use instant-off, lock, suspend, and logout for Hyprland
   for powermenu in ~/.config/rofi/powermenu/type-*/powermenu.sh; do
     if [[ -f "$powermenu" ]]; then
