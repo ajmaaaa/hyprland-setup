@@ -17,9 +17,29 @@ def load(name):
 
 viewers = load('setup-viewers')
 obs = load('setup-obs')
+zen = load('setup-zen')
 
 
 class DesktopSetupTest(unittest.TestCase):
+    def test_zen_default_is_false_and_preserves_other_browser_settings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            installation = Path(folder)
+            (installation / 'application.ini').write_text('[App]\nName=Zen\n')
+            directory = installation / 'defaults/pref'
+            directory.mkdir(parents=True)
+            original = directory / 'channel-prefs.js'
+            original.write_text('pref("app.update.channel", "release");\n')
+            target = zen.configure(installation)
+            self.assertEqual(target.read_text(), 'pref("zen.window-sync.enabled", false);\n')
+            self.assertIn('release', original.read_text())
+            zen.configure(installation)
+            self.assertEqual(list(directory.glob('*.backup-*')), [])
+
+    def test_zen_default_is_skipped_when_browser_is_not_installed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertIsNone(zen.configure(Path(folder)))
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

@@ -476,6 +476,9 @@ else
 fi
 
 # Default viewers and Open With entries; skip applications that were not installed.
+if [[ -f /opt/zen-browser-bin/application.ini ]]; then
+  sudo /usr/bin/python3 "$SCRIPT_DIR/scripts/setup-zen.py" || warn "Could not apply Zen browser defaults."
+fi
 python3 "$SCRIPT_DIR/scripts/setup-archtidy.py" || warn "ArchTidy setup failed. Rerun scripts/setup-archtidy.py."
 if ! python3 "$SCRIPT_DIR/scripts/setup-viewers.py"; then
   warn "Viewer setup failed. Rerun: python3 $SCRIPT_DIR/scripts/setup-viewers.py"

@@ -64,8 +64,28 @@ claude-deepseek   # Claude Code with the separate custom DeepSeek profile
 
 DeepSeek configuration is stored in `~/.config/claude-deepseek/config.json`.
 The default custom model is `deepseek-flash[1m]`; change `model`, `small_model`,
-or `base_url` in this file to customize it. The launcher uses the
+`pro_model`, or `base_url` in this file to customize it. The DeepSeek `/model`
+menu shows **DeepSeek V4.1 Flash** (`deepseek-flash`) and **DeepSeek V4 Pro**
+(`deepseek-v4-pro`) instead of duplicated Claude family labels. **Default** is
+the launcher's selected model, normally Flash, rather than a third model.
+The `[1m]` suffix configures the context window; it is not a different model.
+Version labels follow the [DeepSeek release notes](https://api-docs.deepseek.com/updates/)
+and the model names returned by its API. The Default row resolves to the chosen
+DeepSeek model without a separate ANTHROPIC_DEFAULT_MODEL override.
+Custom labels use Claude Code's `modelPicker` setting (v2.1.242 or later).
+The launcher uses the
 [DeepSeek Anthropic-compatible integration](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/).
+To change the saved API key, API endpoint, or default model, run:
+
+```bash
+claude-deepseek --configure
+```
+
+The key prompt hides input. Leave a field blank to keep its current value. The
+updated profile is saved atomically with permissions `0600`. If you previously
+exported `DEEPSEEK_API_KEY`, run `unset DEEPSEEK_API_KEY` to use the saved new key.
+`--help` describes the profile commands without requesting a key.
+
 Set `DEEPSEEK_API_KEY`, or enter the key at the hidden prompt when launching;
 prompted keys apply only to that session and are not saved. `DEEPSEEK_MODEL`
 and `DEEPSEEK_BASE_URL` can override the custom profile for one session.
@@ -96,6 +116,13 @@ This preserves other Zsh customizations and creates a backup before appending th
 managed source block. Repeated setup adds that block only once.
 
 ## Desktop defaults
+
+When Zen is selected, the installer sets `zen.window-sync.enabled` to `false`
+using a dedicated application default in
+`/opt/zen-browser-bin/defaults/pref/hyprland-setup.js`. This applies before a new
+profile is first opened and remains editable in `about:config`. Existing profile
+preferences, bookmarks, and sessions are preserved; a saved user value can
+override this factory default. Other browser defaults and policies are retained.
 
 | File type | Default application | Open With alternative |
 |-----------|---------------------|-----------------------|

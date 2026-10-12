@@ -45,7 +45,8 @@ def configure(home):
     config.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if not config.exists():
         config.write_text(json.dumps({'base_url': 'https://api.deepseek.com/anthropic',
-                                     'model': 'deepseek-flash[1m]', 'small_model': 'deepseek-flash', 'always_proceed': True}, indent=2) + '\n')
+                                     'model': 'deepseek-flash[1m]', 'small_model': 'deepseek-flash',
+                                     'pro_model': 'deepseek-v4-pro[1m]', 'always_proceed': True}, indent=2) + '\n')
         config.chmod(0o600)
     settings = json.loads(config.read_text())
     key = legacy_key(home)

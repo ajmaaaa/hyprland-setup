@@ -67,6 +67,42 @@ printf '%s\\n' "${selected[@]}"
         with self.assertRaisesRegex(ValueError, 'DEEPSEEK_API_KEY'):
             deepseek.build_launch({}, {'HOME': '/home/test', 'ANTHROPIC_API_KEY': 'test-claude-key'}, [])
 
+    def test_picker_uses_two_distinct_deepseek_models_without_claude_labels(self):
+        args, env = deepseek.build_launch({}, {'HOME': '/home/test', 'DEEPSEEK_API_KEY': 'test-key'}, [])
+        settings = json.loads(args[args.index('--settings') + 1])
+        picker = settings['modelPicker']
+        self.assertTrue(picker['replaceBuiltInOptions'])
+        self.assertEqual([row['label'] for row in picker['options']], ['DeepSeek V4.1 Flash', 'DeepSeek V4 Pro'])
+        self.assertEqual([row['model'] for row in picker['options']], ['deepseek-flash[1m]', 'deepseek-v4-pro[1m]'])
+        self.assertEqual(env['ANTHROPIC_DEFAULT_OPUS_MODEL'], 'deepseek-flash[1m]')
+        self.assertEqual(env['ANTHROPIC_DEFAULT_SONNET_MODEL_NAME'], 'DeepSeek V4.1 Flash')
+        self.assertNotIn('ANTHROPIC_DEFAULT_MODEL', env)
+        self.assertNotIn('test-key', args[args.index('--settings') + 1])
+
+    def test_flash_without_context_suffix_does_not_create_a_duplicate_flash_row(self):
+        args, _ = deepseek.build_launch({'model': 'deepseek-flash'}, {'HOME': '/home/test', 'DEEPSEEK_API_KEY': 'test-key'}, [])
+        settings = json.loads(args[args.index('--settings') + 1])
+        self.assertEqual(len(settings['modelPicker']['options']), 2)
+
+    def test_configure_rotates_key_and_endpoint_without_printing_key(self):
+        from unittest.mock import Mock
+        from contextlib import redirect_stdout
+        import io
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'config.json'
+            config = {'api_key': 'old-test-key', 'always_proceed': True}
+            output = io.StringIO()
+            with redirect_stdout(output):
+                deepseek.configure_profile(path, config, Mock(side_effect=['https://custom.example/anthropic', '2']), Mock(return_value='new-test-key'))
+            saved = json.loads(path.read_text())
+            self.assertEqual(saved['api_key'], 'new-test-key')
+            self.assertEqual(saved['model'], 'deepseek-v4-pro[1m]')
+            self.assertTrue(saved['always_proceed'])
+            self.assertEqual(saved['base_url'], 'https://custom.example/anthropic')
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn('new-test-key', output.getvalue())
+            self.assertNotIn('old-test-key', output.getvalue())
+
     def test_profile_install_preserves_normal_and_custom_settings(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
