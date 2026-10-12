@@ -28,7 +28,8 @@ def build_launch(config, environment, args):
         'CLAUDE_CODE_SUBAGENT_MODEL': small_model,
         'CLAUDE_CONFIG_DIR': str(Path(env.get('XDG_CONFIG_HOME') or Path(env['HOME']) / '.config') / 'claude-deepseek/state'),
     })
-    return ['claude', '--model', model, *args], env
+    flags = ['--dangerously-skip-permissions'] if config.get('always_proceed', True) and '--dangerously-skip-permissions' not in args else []
+    return ['claude', *flags, '--model', model, *args], env
 
 
 def main():

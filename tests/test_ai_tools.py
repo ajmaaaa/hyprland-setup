@@ -61,6 +61,7 @@ printf '%s\\n' "${selected[@]}"
         self.assertNotIn('test-deepseek-key', ' '.join(args))
         self.assertTrue(env['CLAUDE_CONFIG_DIR'].endswith('claude-deepseek/state'))
         self.assertEqual(args[-1], '--continue')
+        self.assertIn('--dangerously-skip-permissions', args)
 
     def test_missing_key_is_reported_without_using_claude_credentials(self):
         with self.assertRaisesRegex(ValueError, 'DEEPSEEK_API_KEY'):
@@ -81,6 +82,29 @@ printf '%s\\n' "${selected[@]}"
             config.write_text(json.dumps(settings))
             profiles.configure(home)
             self.assertEqual(json.loads(config.read_text()), settings)
+
+    def test_legacy_key_is_migrated_without_executing_shell_and_zsh_settings_are_preserved(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            (home / '.claude-deepseek.env').write_text("export ANTHROPIC_AUTH_TOKEN='test-key'\n")
+            (home / '.zshrc').write_text('alias personal="echo preserved"\n')
+            profiles.configure(home)
+            config = json.loads((home / '.config/claude-deepseek/config.json').read_text())
+            self.assertEqual(config['api_key'], 'test-key')
+            profiles.configure(home)
+            zshrc = (home / '.zshrc').read_text()
+            self.assertIn('alias personal="echo preserved"', zshrc)
+            self.assertEqual(zshrc.count('# >>> hyprland-setup AI tools >>>'), 1)
+            self.assertNotIn('test-key', zshrc)
+
+    def test_zsh_commands_add_automatic_flags_and_forward_arguments(self):
+        result = subprocess.run(['zsh', '-dfc', '''source "$1"
+command() { printf '%s\\n' "$@"; }
+claude "prompt with spaces"
+codex "prompt with spaces"
+''', 'test', str(ROOT / 'config/zsh/ai-tools.zsh')], capture_output=True, text=True, check=True)
+        self.assertEqual(result.stdout.splitlines(), ['claude', '--dangerously-skip-permissions', 'prompt with spaces',
+            'codex', '--dangerously-bypass-approvals-and-sandbox', 'prompt with spaces'])
 
 
 if __name__ == '__main__':

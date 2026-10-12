@@ -75,6 +75,10 @@ typeset -U path
 path=("$HOME/.local/bin" $path)
 export PATH
 
+# >>> hyprland-setup AI tools >>>
+[[ ! -r "$HOME/.config/hyprland-setup/ai-tools.zsh" ]] || source "$HOME/.config/hyprland-setup/ai-tools.zsh"
+# <<< hyprland-setup AI tools <<<
+
 # ─── P10k Config ─────────────────────────────────────────
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 

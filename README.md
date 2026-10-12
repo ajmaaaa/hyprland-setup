@@ -72,8 +72,28 @@ and `DEEPSEEK_BASE_URL` can override the custom profile for one session.
 
 The custom launcher scopes provider variables to its child process and keeps
 its state separately. It does not modify normal Claude settings, Codex settings,
-or `.zshrc` provider variables. To use actual Claude models again, run `claude`;
+or `.zshrc` provider variables. Existing keys in `~/.claude-deepseek.env` are
+imported into the private custom profile without executing that file.
+To use actual Claude models again, run `claude`;
 switching Claude model aliases inside the DeepSeek session still uses DeepSeek.
+
+Zsh loads `~/.config/hyprland-setup/ai-tools.zsh`. As requested, `claude` and
+`claude-deepseek` use `--dangerously-skip-permissions`, while `codex` uses
+`--dangerously-bypass-approvals-and-sandbox`. These commands run without tool
+approval prompts; Codex also disables its sandbox. Login and API authentication
+still apply. The old `claude-ds-auto` command forwards to the custom launcher.
+The flags are documented by [Claude Code](https://code.claude.com/docs/en/permissions)
+and [OpenAI](https://developers.openai.com/codex/security/).
+
+Apply these Zsh functions and the custom launcher to an existing installation:
+
+```bash
+python3 scripts/setup-ai-tools.py
+source ~/.zshrc
+```
+
+This preserves other Zsh customizations and creates a backup before appending the
+managed source block. Repeated setup adds that block only once.
 
 ## Desktop defaults
 
