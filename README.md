@@ -41,6 +41,40 @@ preserves an existing root configuration.
 The recommended package selection includes the viewers and Quickshell. If an
 application is deselected or fails to install, its file associations are skipped.
 
+Antigravity IDE stays in the AUR checklist but starts unchecked. It is excluded
+from **all recommended AUR packages**; choose the interactive checklist and
+enable it explicitly to install it. An existing installation is not removed.
+Default-off packages are listed in `packages/default-off.txt`.
+
+## AI coding tools
+
+The recommended npm packages include `@anthropic-ai/claude-code` and
+`@openai/codex`. They are installed as the current user with the npm prefix
+`~/.local`, so no `sudo npm` is used. Installation methods are documented by
+[Claude Code](https://code.claude.com/docs/en/setup#install-with-npm) and
+[OpenAI](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex).
+
+After installation:
+
+```bash
+claude           # Normal Claude Code; sign in to your Claude account
+codex            # Codex CLI; complete its sign-in flow
+claude-deepseek   # Claude Code with the separate custom DeepSeek profile
+```
+
+DeepSeek configuration is stored in `~/.config/claude-deepseek/config.json`.
+The default custom model is `deepseek-flash[1m]`; change `model`, `small_model`,
+or `base_url` in this file to customize it. The launcher uses the
+[DeepSeek Anthropic-compatible integration](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/).
+Set `DEEPSEEK_API_KEY`, or enter the key at the hidden prompt when launching;
+prompted keys apply only to that session and are not saved. `DEEPSEEK_MODEL`
+and `DEEPSEEK_BASE_URL` can override the custom profile for one session.
+
+The custom launcher scopes provider variables to its child process and keeps
+its state separately. It does not modify normal Claude settings, Codex settings,
+or `.zshrc` provider variables. To use actual Claude models again, run `claude`;
+switching Claude model aliases inside the DeepSeek session still uses DeepSeek.
+
 ## Desktop defaults
 
 | File type | Default application | Open With alternative |

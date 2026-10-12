@@ -1,2 +1,6 @@
 prettier
 pyright
+
+# AI CODING ASSISTANTS
+@anthropic-ai/claude-code
+@openai/codex

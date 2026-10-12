@@ -44,8 +44,9 @@ PACMAN_FILE="$SCRIPT_DIR/packages/pacman.txt"
 AUR_FILE="$SCRIPT_DIR/packages/aur.txt"
 NPM_FILE="$SCRIPT_DIR/packages/npm.txt"
 SERVICES_FILE="$SCRIPT_DIR/packages/services.txt"
+DEFAULT_OFF_FILE="$SCRIPT_DIR/packages/default-off.txt"
 
-for file in "$PACMAN_FILE" "$AUR_FILE" "$NPM_FILE" "$SERVICES_FILE"; do
+for file in "$PACMAN_FILE" "$AUR_FILE" "$NPM_FILE" "$SERVICES_FILE" "$DEFAULT_OFF_FILE"; do
   if [[ ! -f "$file" ]]; then
     error "Missing required file: $file"
   fi
@@ -92,73 +93,7 @@ ensure_dialog() {
   fi
 }
 
-# Parse a package file and output lines in "package|CATEGORY" format.
-# Skips empty lines, separator lines (===), and inline comments.
-parse_packages() {
-  local file="$1"
-  local current_category="General"
-  while IFS= read -r line; do
-    # Skip empty lines
-    [[ -z "${line// }" ]] && continue
-    # Skip separator lines (lines containing only #, =, -, spaces)
-    [[ "$line" =~ ^[[:space:]]*#[[:space:]]*[=\-]+[[:space:]]*$ ]] && continue
-    # Detect category header: "# CATEGORY NAME"
-    if [[ "$line" =~ ^[[:space:]]*#[[:space:]]+([A-Za-z][A-Za-z0-9\ /\&\.\-]+)[[:space:]]*$ ]]; then
-      current_category="$(echo "${BASH_REMATCH[1]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    # Regular package line (not a comment)
-    elif [[ ! "$line" =~ ^[[:space:]]*# ]]; then
-      local pkg
-      pkg="$(echo "$line" | tr -d '[:space:]')"
-      [[ -n "$pkg" ]] && echo "$pkg|$current_category"
-    fi
-  done < "$file"
-}
-
-# Show an interactive dialog checklist for the given package file.
-# Stores selected packages into the given array variable name.
-show_checklist() {
-  local title="$1"
-  local file="$2"
-  local -n result_ref="$3"   # nameref to output array
-
-  local TMPFILE
-  TMPFILE=$(mktemp)
-
-  # Build checklist items: ("pkg" "[CATEGORY]" "on") ...
-  local ITEMS=()
-  while IFS='|' read -r pkg category; do
-    local status="on"
-    local disp_category="[$category]"
-    if [[ -n "${INSTALLED_PKGS[$pkg]}" ]]; then
-      status="off"
-      disp_category="[Installed] $category"
-    fi
-    ITEMS+=("$pkg" "$disp_category" "$status")
-  done < <(parse_packages "$file")
-
-  dialog \
-    --title " $title " \
-    --backtitle "Arch Hyprland Setup — Package Selection" \
-    --checklist "\nSelect packages to install.\n\n  SPACE = toggle on/off   ENTER = confirm   TAB = switch buttons\n" \
-    0 0 0 \
-    "${ITEMS[@]}" 2>"$TMPFILE"
-
-  local EXIT_CODE=$?
-
-  if [[ $EXIT_CODE -ne 0 ]]; then
-    rm -f "$TMPFILE"
-    clear
-    warn "Selection cancelled for '$title'. No packages selected."
-    result_ref=()
-    return 1
-  fi
-
-  # Parse dialog output: space-separated, possibly quoted
-  mapfile -t result_ref < <(cat "$TMPFILE" | tr -d '"' | tr ' ' '\n' | grep -v '^$')
-  rm -f "$TMPFILE"
-  clear
-  return 0
-}
+source "$SCRIPT_DIR/scripts/package-selection.sh"
 
 # Load all installed packages into a map for fast lookup
 declare -A INSTALLED_PKGS
@@ -175,8 +110,8 @@ read -rp "  Proceed with all recommended Pacman packages? [Y/n]: " INSTALL_ALL_P
 INSTALL_ALL_PACMAN="${INSTALL_ALL_PACMAN:-Y}"
 
 # Initialize arrays with all recommended packages (default)
-mapfile -t FINAL_PACMAN_PACKAGES < <(grep -vE '^\s*#|^\s*$' "$PACMAN_FILE")
-mapfile -t FINAL_AUR_PACKAGES    < <(grep -vE '^\s*#|^\s*$' "$AUR_FILE")
+mapfile -t FINAL_PACMAN_PACKAGES < <(recommended_packages "$PACMAN_FILE")
+mapfile -t FINAL_AUR_PACKAGES    < <(recommended_packages "$AUR_FILE")
 
 PACMAN_INTERACTIVE=false
 if [[ "${INSTALL_ALL_PACMAN,,}" == "n" ]]; then
@@ -357,7 +292,13 @@ while IFS= read -r line; do
     echo -e "${YELLOW}  Category: ${BASH_REMATCH[1]}${RESET}"
   elif [[ ! "$line" =~ ^[[:space:]]*# ]]; then
     pkg="$(echo "$line" | tr -d '[:space:]')"
-    [[ -n "$pkg" ]] && echo -e "    • $pkg"
+    if [[ -n "$pkg" ]]; then
+      if package_default_enabled "$pkg"; then
+        echo -e "    • $pkg"
+      else
+        echo -e "    • $pkg (optional; default off)"
+      fi
+    fi
   fi
 done < "$AUR_FILE"
 
@@ -452,19 +393,23 @@ fi
 
 installer_stage "Install npm packages"
 info "Installing global npm packages..."
-NPM_PACKAGES=$(grep -vE '^\s*#|^\s*$' "$NPM_FILE")
+mapfile -t NPM_PACKAGES < <(recommended_packages "$NPM_FILE")
 
-if [[ -n "$NPM_PACKAGES" ]]; then
-  if ! sudo npm install -g $NPM_PACKAGES; then
+if [[ ${#NPM_PACKAGES[@]} -gt 0 ]] && command -v npm >/dev/null; then
+  if ! npm install --global --prefix "$HOME/.local" "${NPM_PACKAGES[@]}"; then
     warn "Failed to install global npm packages."
   else
     success "Global npm packages installed."
   fi
+elif [[ ${#NPM_PACKAGES[@]} -gt 0 ]]; then
+  warn "npm is unavailable. Install nodejs and npm to add the selected CLI tools."
 fi
 
 # =============================================================================
 # ENABLE SYSTEM SERVICES
 # =============================================================================
+
+python3 "$SCRIPT_DIR/scripts/setup-ai-tools.py" || warn "AI tool profile setup failed. Rerun scripts/setup-ai-tools.py."
 
 installer_stage "Enable system services"
 info "Enabling system services..."
