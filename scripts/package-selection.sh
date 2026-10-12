@@ -85,4 +85,3 @@ show_checklist() {
   clear
   return 0
 }
-
