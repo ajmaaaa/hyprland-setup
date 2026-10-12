@@ -241,6 +241,10 @@ hl.bind(mainMod .. " + N", hl.dsp.exec_cmd(term .. " -e nvim"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("protonvpn-app"))
 hl.bind(mainMod .. " + P", hl.dsp.exec_cmd("~/.config/hypr/scripts/display-monitor.sh"))
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("~/.config/hypr/scripts/connections.sh"))
+hl.bind(mainMod .. " + ALT + C", hl.dsp.exec_cmd("~/.local/bin/archtidy"))
+hl.bind(mainMod .. " + U", hl.dsp.exec_cmd("~/.local/bin/archtidy"))
+
+
 
 -- System Controls
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprctl reload"))
@@ -308,4 +312,12 @@ for i = 1, 10 do
     local key = i % 10
     hl.bind(mainMod .. " + " .. key,         hl.dsp.focus({ workspace = i }))
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+end
+
+hl.window_rule({ match = { class = "^(archtidy)$" }, float = true, center = true })
+
+
+-- Outside clicks dismiss utility panels while the click reaches its target.
+for _, button in ipairs({ "mouse:272", "mouse:273", "mouse:274" }) do
+    hl.bind(button, hl.dsp.exec_cmd("~/.config/hypr/scripts/dismiss-panels.sh"), { non_consuming = true })
 end

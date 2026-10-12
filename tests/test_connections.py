@@ -12,6 +12,11 @@ spec.loader.exec_module(popup)
 
 
 class ConnectionsTest(unittest.TestCase):
+    def setUp(self):
+        native = patch.object(popup, 'native_hotspot_active', return_value=False)
+        native.start()
+        self.addCleanup(native.stop)
+
     def test_native_action_dialog_opens_and_returns_selection(self):
         try:
             import gi
@@ -49,10 +54,11 @@ class ConnectionsTest(unittest.TestCase):
              patch.object(popup, 'proton_profiles', return_value=[('Japan', 'saved-uuid')]), \
              patch.object(popup, 'rows', return_value=[]), \
              patch.object(popup, 'run', return_value=subprocess.CompletedProcess([], 0, 'Disconnected.', '')) as run, \
-             patch.object(popup, 'menu', return_value=1) as menu, \
+             patch.object(popup, 'menu', side_effect=[1, 4]) as menu, \
              patch.object(popup, 'nm') as nm:
             popup.vpn()
-            self.assertEqual(menu.call_args.args[1], ['Automatic', 'Japan', 'Add server…', 'Disconnect'])
+            self.assertEqual(menu.call_args_list[0].args[1], ['Automatic (Fastest)', 'Select server', 'Disconnect'])
+            self.assertIn('Custom: Japan', menu.call_args_list[1].args[1])
             nm.assert_called_once_with('connection', 'up', 'uuid', 'saved-uuid')
             self.assertFalse(any(call.args[0] == ['protonvpn', 'connect'] for call in run.call_args_list))
 
@@ -76,7 +82,7 @@ class ConnectionsTest(unittest.TestCase):
              patch.object(popup, 'nm') as nm:
             popup.vpn()
             nm.assert_called_once_with('connection', 'down', 'uuid', 'saved-uuid')
-            run.assert_called_with(['protonvpn', 'connect'], timeout=90)
+            self.assertTrue(any(call.args[0] == ['protonvpn', 'connect'] for call in run.call_args_list))
 
     def test_network_names_and_mac_addresses_are_not_split(self):
         self.assertEqual(popup.fields(r'*:Cafe\: Guest\\AP:80:WPA2:AA\:BB\:CC\:DD\:EE\:FF:wlan0'),
@@ -138,14 +144,45 @@ class ConnectionsTest(unittest.TestCase):
 
     def test_cancel_supported_hotspot_preserves_current_wifi(self):
         with patch.object(popup, 'devices', return_value=[['wlan0', 'wifi', 'connected', 'Home']]), \
-             patch.object(popup, 'nm', side_effect=['yes', 'current-uuid', 'infrastructure']) as nm, \
-             patch.object(popup, 'menu', return_value=0), \
-             patch.object(popup, 'entry', return_value='My hotspot'), \
-             patch.object(popup, 'confirm', return_value=False), \
-             patch.object(popup, 'info'):
+             patch.object(popup, 'nm', side_effect=['yes', '']) as nm, \
+             patch.object(popup, 'rows', return_value=[]), \
+             patch.object(popup, 'menu', return_value=2), \
+             patch.object(popup, 'action') as action:
             popup.hotspot()
-            self.assertEqual(nm.call_count, 3)
-            self.assertFalse(any('hotspot' in call.args for call in nm.call_args_list))
+            action.assert_not_called()
+
+    def test_vpn_select_free_country(self):
+        with patch.object(popup.shutil, 'which', return_value='/usr/bin/protonvpn'), \
+             patch.object(popup, 'proton_profiles', return_value=[]), \
+             patch.object(popup, 'rows', return_value=[]), \
+             patch.object(popup, 'run', return_value=subprocess.CompletedProcess([], 0, 'Disconnected.', '')), \
+             patch.object(popup, 'menu', side_effect=[1, 0]), \
+             patch.object(popup, 'action') as action:
+            popup.vpn()
+            action.assert_called_once_with(['protonvpn', 'connect', '--country', 'SG'])
+
+    def test_ethernet_connected_offers_disconnect(self):
+        with patch.object(popup, 'devices', return_value=[['eth0', 'ethernet', 'connected', 'Wired 1']]), \
+             patch.object(popup, 'menu', return_value=0) as menu, \
+             patch.object(popup, 'rows', return_value=[['uuid-123', 'eth0']]), \
+             patch.object(popup, 'run') as run, \
+             patch.object(popup, 'nm') as nm:
+            popup.ethernet()
+            self.assertEqual(menu.call_args.args[1][0], 'Disconnect')
+            nm.assert_called_with('device', 'disconnect', 'eth0')
+            self.assertTrue(any('connection' in call.args[0] and 'down' in call.args[0] for call in run.call_args_list))
+
+    def test_adb_pair_qr_displays_qr(self):
+        with patch.object(popup.shutil, 'which', return_value='/usr/bin/adb'), \
+             patch.object(popup, 'adb_run', return_value=''), \
+             patch.object(popup.threading, 'Thread'), \
+             patch.object(popup, 'show_qr') as show_qr:
+            popup.adb_pair_qr()
+            show_qr.assert_called_once()
+            service, code, svg = show_qr.call_args.args[:3]
+            self.assertTrue(service.startswith('studio-'))
+            self.assertTrue(code.isdigit() and len(code) == 10)
+            self.assertEqual(show_qr.call_args.kwargs.get('security'), 'ADB')
 
     def test_adb_endpoint_rejects_invalid_addresses_and_ports(self):
         self.assertEqual(popup.adb_endpoint('192.168.1.10:37123'), '192.168.1.10:37123')
@@ -173,6 +210,96 @@ class ConnectionsTest(unittest.TestCase):
              patch.object(popup, 'run', return_value=subprocess.CompletedProcess([], 0, 'failed to connect', '')):
             with self.assertRaises(RuntimeError):
                 popup.adb_run('connect', '192.168.1.10:37123')
+
+    def test_wifi_qr_text_format(self):
+        self.assertEqual(popup.wifi_qr_text('Cafe;Net', 'secret:123', 'WPA2'),
+                         r'WIFI:T:WPA;S:Cafe\;Net;P:secret\:123;;')
+        self.assertEqual(popup.wifi_qr_text('OpenWifi', '', None),
+                         'WIFI:T:nopass;S:OpenWifi;;')
+
+    def test_qr_to_svg_produces_valid_svg(self):
+        svg = popup.qr_to_svg('WIFI:T:WPA;S:Test;P:12345678;;')
+        self.assertIn('<svg xmlns="http://www.w3.org/2000/svg"', svg)
+        self.assertIn('</svg>', svg)
+        self.assertIn('<rect', svg)
+
+    def test_bluetooth_connect_ensures_trust(self):
+        with patch.object(popup, 'bt') as bt:
+            bt.side_effect = lambda *args: 'Connected: yes' if args[0] == 'info' else ''
+            popup.connect_bluetooth(('AA:BB:CC:DD:EE:FF', 'Earbuds', False, True, ''))
+            self.assertTrue(any(call.args == ('trust', 'AA:BB:CC:DD:EE:FF') for call in bt.call_args_list))
+
+    def test_hotspot_active_offers_qr_and_shutdown(self):
+        with patch.object(popup, 'devices', return_value=[['wlan0', 'wifi', 'connected', 'Hyprland Hotspot']]), \
+             patch.object(popup, 'nm', side_effect=['yes', 'hotspot-uuid', 'ap', 'Hyprland Hotspot', 'secret12345']), \
+             patch.object(popup, 'menu', return_value=1), \
+             patch.object(popup, 'show_qr_screen') as show_qr, \
+             patch.object(popup, 'notify'):
+            popup.hotspot()
+            show_qr.assert_called_once_with('Hyprland Hotspot', 'secret12345', 'WPA')
+
+    def test_home_list_layout_has_all_connection_items(self):
+        try:
+            import gi
+        except ImportError:
+            self.skipTest('GTK bindings are only needed for the graphical panel')
+        sys.modules.setdefault('connections', popup)
+        ui_spec = importlib.util.spec_from_file_location('connections_ui', Path(__file__).resolve().parents[1] / 'config/scripts/connections-ui.py')
+        ui = importlib.util.module_from_spec(ui_spec)
+        ui_spec.loader.exec_module(ui)
+        home_list = ui.Gtk.ListBox()
+        panel = SimpleNamespace(
+            closed=False, busy=False, page='home', snapshot=None,
+            home_list=home_list, listbox=ui.Gtk.ListBox(),
+            select_page=Mock(), perform=Mock(), set_notice=Mock(),
+            clear_rows=Mock(),
+            add_home_row=lambda *args, **kwargs: ui.Panel.add_home_row(panel, *args, **kwargs)
+        )
+        data = (['wlan0'], [], 'HomeNet', '', 'MyHeadset')
+        ui.Panel.render(panel, 'home', data, None)
+        children = home_list.get_children()
+        self.assertEqual(len(children), 7)
+        titles = [row.get_child().get_children()[1].get_children()[0].get_text() for row in children]
+        self.assertEqual(titles, ['Wi-Fi', 'Bluetooth', 'Ethernet', 'Hotspot', 'VPN', 'Airplane Mode', 'Wireless Debugging'])
+
+    def test_default_names_and_renaming(self):
+        with patch.object(popup, 'get_adb_aliases', return_value={}):
+            self.assertTrue(popup.get_wireless_name().startswith('Arch-ADB'))
+        with patch.object(popup, 'set_adb_alias') as mock_set:
+            popup.set_wireless_name('ArchDevice')
+            mock_set.assert_called_once_with('__wireless_name__', 'ArchDevice')
+
+    def test_qr_icon_pixbuf_loads(self):
+        try:
+            import gi
+        except ImportError:
+            self.skipTest('GTK bindings are only needed for the graphical panel')
+        ui_spec = importlib.util.spec_from_file_location('connections_ui', Path(__file__).resolve().parents[1] / 'config/scripts/connections-ui.py')
+        ui = importlib.util.module_from_spec(ui_spec)
+        ui_spec.loader.exec_module(ui)
+        pb = ui.qr_icon_pixbuf(18)
+        self.assertIsNotNone(pb)
+        self.assertEqual(pb.get_width(), 18)
+        self.assertEqual(pb.get_height(), 18)
+
+    def test_get_ethernet_status_states(self):
+        with patch.object(popup, 'devices', return_value=[]):
+            self.assertEqual(popup.get_ethernet_status()[0], 'unavailable')
+        with patch.object(popup, 'devices', return_value=[['enp0s31f6', 'ethernet', 'unavailable', '--']]):
+            self.assertEqual(popup.get_ethernet_status()[0], 'unavailable')
+        with patch.object(popup, 'devices', return_value=[['enp0s31f6', 'ethernet', 'disconnected', '--']]):
+            self.assertEqual(popup.get_ethernet_status()[0], 'disconnected')
+        with patch.object(popup, 'devices', return_value=[['enp0s31f6', 'ethernet', 'connected', 'OfficeNet']]):
+            status, text = popup.get_ethernet_status()
+            self.assertEqual(status, 'connected')
+            self.assertIn('OfficeNet', text)
+
+    def test_wifi_qr_escaping_special_chars(self):
+        text = popup.wifi_qr_text('Test;SSID,with"special:chars\\', 'P@ss;w,o:r"d\\', 'WPA')
+        self.assertIn(r'S:Test\;SSID\,with\"special\:chars\\', text)
+        self.assertIn(r'P:P@ss\;w\,o\:r\"d\\', text)
+        open_text = popup.wifi_qr_text('OpenNet', None, None)
+        self.assertEqual(open_text, 'WIFI:T:nopass;S:OpenNet;;')
 
 
 if __name__ == '__main__':

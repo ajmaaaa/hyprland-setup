@@ -36,6 +36,9 @@ fi
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/scripts/installer-ui.sh"
+installer_ui_start
+trap installer_ui_restore EXIT
 
 PACMAN_FILE="$SCRIPT_DIR/packages/pacman.txt"
 AUR_FILE="$SCRIPT_DIR/packages/aur.txt"
@@ -52,17 +55,11 @@ done
 # PRE-CHECK: INTERNET & DNS
 # =============================================================================
 
+installer_stage "Network checks"
+for prerequisite in sudo pacman curl git; do
+  command -v "$prerequisite" >/dev/null || error "Missing prerequisite: $prerequisite. Install it before running setup."
+done
 info "Checking internet connection..."
-if ! ping -c 1 -W 3 8.8.8.8 &>/dev/null; then
-  warn "Connection issues detected. Setting DNS to Google & Cloudflare..."
-  sudo tee /etc/resolv.conf > /dev/null << 'EOF'
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-nameserver 1.1.1.1
-EOF
-  sudo chattr +i /etc/resolv.conf 2>/dev/null || true
-  sleep 2
-fi
 
 MAX_RETRY=5
 ATTEMPT=0
@@ -70,7 +67,7 @@ CONNECTED=false
 
 while [[ $ATTEMPT -lt $MAX_RETRY ]]; do
   ATTEMPT=$((ATTEMPT + 1))
-  if ping -c 1 -W 3 github.com &>/dev/null; then
+  if curl --silent --fail --location --max-time 10 --output /dev/null https://github.com; then
     CONNECTED=true
     break
   fi
@@ -127,14 +124,6 @@ show_checklist() {
   local TMPFILE
   TMPFILE=$(mktemp)
 
-  # Determine dialog dimensions based on terminal size
-  local H W LH
-  H=$(( $(tput lines) - 4 ))
-  W=$(( $(tput cols) - 6 ))
-  [[ $H -lt 20 ]] && H=20
-  [[ $W -lt 60 ]] && W=60
-  LH=$(( H - 8 ))
-
   # Build checklist items: ("pkg" "[CATEGORY]" "on") ...
   local ITEMS=()
   while IFS='|' read -r pkg category; do
@@ -151,7 +140,7 @@ show_checklist() {
     --title " $title " \
     --backtitle "Arch Hyprland Setup — Package Selection" \
     --checklist "\nSelect packages to install.\n\n  SPACE = toggle on/off   ENTER = confirm   TAB = switch buttons\n" \
-    "$H" "$W" "$LH" \
+    0 0 0 \
     "${ITEMS[@]}" 2>"$TMPFILE"
 
   local EXIT_CODE=$?
@@ -159,9 +148,8 @@ show_checklist() {
   if [[ $EXIT_CODE -ne 0 ]]; then
     rm -f "$TMPFILE"
     clear
-    warn "Selection cancelled for '$title'. Falling back to all recommended packages."
-    # Fallback: load all packages from file
-    mapfile -t result_ref < <(grep -vE '^\s*#|^\s*$' "$file")
+    warn "Selection cancelled for '$title'. No packages selected."
+    result_ref=()
     return 1
   fi
 
@@ -181,14 +169,8 @@ if command -v pacman &>/dev/null; then
 fi
 
 # --- PROMPT USER FOR PACMAN PACKAGES ---
-echo ""
-echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BLUE}║          PACMAN PACKAGE INSTALLATION OPTIONS         ║${RESET}"
-echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${RESET}"
-echo -e "${BLUE}║  ${GREEN}[Y]${RESET}  Install all recommended Pacman packages       ${BLUE}║${RESET}"
-echo -e "${BLUE}║  ${YELLOW}[N]${RESET}  Choose Pacman packages interactively          ${BLUE}║${RESET}"
-echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
-echo ""
+installer_stage "Choose Pacman packages"
+printf '  [Y] Install all recommended Pacman packages\n  [N] Choose packages with the full-screen checklist\n\n'
 read -rp "  Proceed with all recommended Pacman packages? [Y/n]: " INSTALL_ALL_PACMAN
 INSTALL_ALL_PACMAN="${INSTALL_ALL_PACMAN:-Y}"
 
@@ -210,6 +192,7 @@ info "Installing ${#FINAL_PACMAN_PACKAGES[@]} pacman packages."
 # CONFIGURE PACMAN FOR BETTER DOWNLOAD RELIABILITY
 # =============================================================================
 
+installer_stage "Prepare package downloads"
 info "Configuring pacman for reliable downloads..."
 # Enable parallel downloads
 if ! grep -q '^ParallelDownloads' /etc/pacman.conf; then
@@ -226,6 +209,7 @@ success "Pacman configured."
 # SYSTEM UPDATE
 # =============================================================================
 
+installer_stage "System update"
 info "Updating system packages..."
 sudo pacman -Syu --noconfirm
 
@@ -233,6 +217,7 @@ sudo pacman -Syu --noconfirm
 # INSTALL PACMAN PACKAGES
 # =============================================================================
 
+installer_stage "Install Pacman packages"
 info "Installing pacman packages..."
 
 if [[ ${#FINAL_PACMAN_PACKAGES[@]} -gt 0 ]]; then
@@ -267,34 +252,36 @@ success "Pacman packages installed."
 # INSTALL YAY (AUR HELPER)
 # =============================================================================
 
+installer_stage "Set up the AUR helper"
 if ! command -v yay &>/dev/null; then
   info "Installing yay AUR helper..."
+  sudo pacman -S --needed --noconfirm base-devel git
   # Add curl retry flag to makepkg config
   if ! grep -qF -- "--retry 5" /etc/makepkg.conf; then
     sudo sed -i '/curl/s/-o %o %u/--retry 5 --retry-delay 5 -o %o %u/' /etc/makepkg.conf
   fi
 
-  TMPDIR=$(mktemp -d)
+  YAY_BUILD_DIR=$(mktemp -d)
   YAY_CLONED=false
   for i in $(seq 1 5); do
-    if git clone --depth=1 https://aur.archlinux.org/yay.git "$TMPDIR/yay"; then
+    if git clone --depth=1 https://aur.archlinux.org/yay.git "$YAY_BUILD_DIR/yay"; then
       YAY_CLONED=true
       break
     fi
     warn "git clone failed, retrying... ($i/5)"
-    rm -rf "$TMPDIR/yay"
+    rm -rf "$YAY_BUILD_DIR/yay"
     sleep 3
   done
 
   if [[ "$YAY_CLONED" == false ]]; then
-    rm -rf "$TMPDIR"
+    rm -rf "$YAY_BUILD_DIR"
     error "Failed to clone yay repository after 5 attempts. Check your internet connection."
   fi
 
-  cd "$TMPDIR/yay"
+  cd "$YAY_BUILD_DIR/yay"
   makepkg -si --noconfirm
   cd "$SCRIPT_DIR"
-  rm -rf "$TMPDIR"
+  rm -rf "$YAY_BUILD_DIR"
   success "yay installed successfully."
 else
   info "yay is already installed."
@@ -358,9 +345,7 @@ import_missing_pgp_key() {
 }
 
 # --- PROMPT USER FOR AUR PACKAGES ---
-echo -e "\n${BLUE}======================================================${RESET}"
-echo -e "${BLUE}          AUR PACKAGES LIST                           ${RESET}"
-echo -e "${BLUE}======================================================${RESET}"
+installer_stage "Choose AUR packages"
 # Parse aur.txt to display categories and packages nicely
 while IFS= read -r line; do
   # Skip empty lines
@@ -375,15 +360,8 @@ while IFS= read -r line; do
     [[ -n "$pkg" ]] && echo -e "    • $pkg"
   fi
 done < "$AUR_FILE"
-echo -e "${BLUE}======================================================${RESET}\n"
 
-echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BLUE}║          AUR PACKAGE INSTALLATION OPTIONS            ║${RESET}"
-echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${RESET}"
-echo -e "${BLUE}║  ${GREEN}[Y]${RESET}  Install all listed AUR packages               ${BLUE}║${RESET}"
-echo -e "${BLUE}║  ${YELLOW}[N]${RESET}  Choose AUR packages interactively (checklist)  ${BLUE}║${RESET}"
-echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
-echo ""
+printf '  [Y] Install all recommended AUR packages\n  [N] Choose packages with the full-screen checklist\n\n'
 read -rp "  Proceed with all recommended AUR packages? [Y/n]: " INSTALL_ALL_AUR
 INSTALL_ALL_AUR="${INSTALL_ALL_AUR:-Y}"
 
@@ -396,9 +374,7 @@ if [[ "${INSTALL_ALL_AUR,,}" == "n" ]]; then
 fi
 
 # Print beautiful installation header
-echo -e "\n${BLUE}======================================================${RESET}"
-echo -e "${BLUE}          STARTING AUR PACKAGES INSTALLATION          ${RESET}"
-echo -e "${BLUE}======================================================${RESET}"
+installer_stage "Download and build AUR packages"
 if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   echo -e "Installing the following AUR packages:"
   for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
@@ -412,6 +388,7 @@ fi
 AUR_MAX_RETRY=3
 
 if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
+  sudo pacman -S --needed --noconfirm base-devel
   set +e
   AUR_FAILED=()
   aur_needed_flag="--needed"
@@ -427,8 +404,11 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
       PKG_INSTALLED=false
 
       for attempt in $(seq 1 $AUR_MAX_RETRY); do
-        install_output=$(yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch "$pkg" 2>&1)
+        aur_attempt_log=$(mktemp)
+        installer_run_logged "$aur_attempt_log" yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch "$pkg"
         install_status=$?
+        install_output=$(cat "$aur_attempt_log")
+        rm -f "$aur_attempt_log"
 
         if [[ $install_status -eq 0 ]]; then
           success "$pkg installed successfully."
@@ -470,6 +450,7 @@ fi
 # INSTALL NPM PACKAGES
 # =============================================================================
 
+installer_stage "Install npm packages"
 info "Installing global npm packages..."
 NPM_PACKAGES=$(grep -vE '^\s*#|^\s*$' "$NPM_FILE")
 
@@ -485,6 +466,7 @@ fi
 # ENABLE SYSTEM SERVICES
 # =============================================================================
 
+installer_stage "Enable system services"
 info "Enabling system services..."
 while read -r service; do
   [[ -z "$service" || "$service" =~ ^# ]] && continue
@@ -508,14 +490,20 @@ fi
 # COPY CONFIGURATION FILES
 # =============================================================================
 
+installer_stage "Configure the desktop and utility panels"
 info "Copying configuration files..."
 
 # Hyprland main config
+if [[ -d "$HOME/.config/hypr" ]]; then
+  hypr_backup="$HOME/.local/state/hyprland-setup/hyprland/$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$hypr_backup"
+  cp -a "$HOME/.config/hypr" "$hypr_backup/"
+fi
 mkdir -p "$HOME/.config/hypr"
-# Remove legacy config to ensure Hyprland runs the new hyprland.lua config natively
-rm -f "$HOME/.config/hypr/hyprland.conf"
 if [[ -d "$SCRIPT_DIR/config/hypr" ]]; then
   cp -r "$SCRIPT_DIR/config/hypr/." "$HOME/.config/hypr/"
+  # The repository retains a legacy example, but new installs use Lua.
+  rm -f "$HOME/.config/hypr/hyprland.conf"
   success "Hyprland configuration copied."
 fi
 
@@ -543,6 +531,7 @@ else
 fi
 
 # Default viewers and Open With entries; skip applications that were not installed.
+python3 "$SCRIPT_DIR/scripts/setup-archtidy.py" || warn "ArchTidy setup failed. Rerun scripts/setup-archtidy.py."
 if ! python3 "$SCRIPT_DIR/scripts/setup-viewers.py"; then
   warn "Viewer setup failed. Rerun: python3 $SCRIPT_DIR/scripts/setup-viewers.py"
 fi
@@ -587,64 +576,57 @@ fi
 # SNAPPER CONFIGURATION
 # =============================================================================
 
-info "Configuring Snapper for root..."
-sudo mkdir -p /etc/snapper/configs
-sudo tee /etc/snapper/configs/root > /dev/null << 'EOF'
-SUBVOLUME="/"
-FSTYPE="btrfs"
-QGROUP=""
-SPACE_LIMIT="0.5"
-FREE_LIMIT="0.2"
-ALLOW_USERS=""
-ALLOW_GROUPS=""
-SYNC_ACL="no"
-BACKGROUND_COMPARISON="yes"
-NUMBER_CLEANUP="yes"
-NUMBER_MIN_AGE="3600"
-NUMBER_LIMIT="50"
-NUMBER_LIMIT_IMPORTANT="10"
-TIMELINE_CREATE="no"
-TIMELINE_CLEANUP="yes"
-TIMELINE_LIMIT_HOURLY="3"
-TIMELINE_LIMIT_DAILY="5"
-TIMELINE_LIMIT_WEEKLY="2"
-TIMELINE_LIMIT_MONTHLY="1"
-TIMELINE_LIMIT_QUARTERLY="0"
-TIMELINE_LIMIT_YEARLY="0"
-EMPTY_PRE_POST_CLEANUP="yes"
-EMPTY_PRE_POST_MIN_AGE="3600"
-EOF
-success "Snapper root configuration updated."
+installer_stage "Configure snapshots"
+if [[ "$(findmnt -n -o FSTYPE /)" != btrfs ]]; then
+  info "Skipping Snapper: the root filesystem is not Btrfs."
+elif [[ -f /etc/snapper/configs/root ]]; then
+  info "Keeping the existing Snapper root configuration."
+elif sudo snapper -c root create-config /; then
+  sudo snapper -c root set-config NUMBER_LIMIT=50 NUMBER_LIMIT_IMPORTANT=10 TIMELINE_CREATE=no
+  success "Snapper root configuration created."
+else
+  warn "Snapper setup failed; existing files were preserved."
+fi
 
 # =============================================================================
 # NVCHAD SETUP
 # =============================================================================
 
+installer_stage "Set up Neovim"
 info "Setting up NvChad..."
-rm -rf ~/.config/nvim ~/.local/share/nvim ~/.cache/nvim
-git clone --depth=1 https://github.com/NvChad/starter ~/.config/nvim
-
-mkdir -p ~/.config/nvim/lua
-cat > ~/.config/nvim/lua/chadrc.lua << 'LUAEOF'
----@type ChadrcConfig
+nvchad_staging=$(mktemp -d)
+if git clone --depth=1 https://github.com/NvChad/starter "$nvchad_staging/nvim"; then
+  if [[ -e "$HOME/.config/nvim" ]]; then
+    nvim_backup="$HOME/.local/state/hyprland-setup/neovim/$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$nvim_backup"
+    mv "$HOME/.config/nvim" "$nvim_backup/nvim"
+  fi
+  mkdir -p "$HOME/.config"
+  mv "$nvchad_staging/nvim" "$HOME/.config/nvim"
+  cat > "$HOME/.config/nvim/lua/chadrc.lua" << 'LUAEOF'
 local M = {}
 M.ui = { theme = "horizon" }
 return M
 LUAEOF
-success "NvChad cloned and horizon theme applied."
+  success "NvChad installed. Existing Neovim configuration was backed up."
+else
+  warn "NvChad download failed; the existing Neovim configuration was preserved."
+fi
+rm -rf "$nvchad_staging"
 
 # =============================================================================
 # ROFI THEMES
 # =============================================================================
 
+installer_stage "Configure application menus"
 info "Installing Rofi themes..."
-TMPDIR=$(mktemp -d)
-git clone --depth=1 https://github.com/adi1090x/rofi.git "$TMPDIR/rofi"
-cd "$TMPDIR/rofi"
+YAY_BUILD_DIR=$(mktemp -d)
+git clone --depth=1 https://github.com/adi1090x/rofi.git "$YAY_BUILD_DIR/rofi"
+cd "$YAY_BUILD_DIR/rofi"
 chmod +x setup.sh
 ./setup.sh
 cd "$SCRIPT_DIR"
-rm -rf "$TMPDIR"
+rm -rf "$YAY_BUILD_DIR"
 
 ln -sf ~/.config/rofi/launchers/type-6/launcher.sh ~/.config/rofi/launcher_active.sh
 sed -i "s/theme=.*/theme='style-7'/g" ~/.config/rofi/launchers/type-6/launcher.sh
@@ -672,31 +654,51 @@ cp "$SCRIPT_DIR/config/rofi/connections.rasi" "$HOME/.config/rofi/connections.ra
 # POWERLEVEL10K & ZSH
 # =============================================================================
 
+installer_stage "Configure Zsh and Powerlevel10k"
 info "Setting up Powerlevel10k and ZSH..."
-if [[ -d "$SCRIPT_DIR/powerlevel10k" && "$(ls -A "$SCRIPT_DIR/powerlevel10k" 2>/dev/null | grep -v '.gitkeep')" ]]; then
-  cp -r "$SCRIPT_DIR/powerlevel10k/." ~/powerlevel10k/
+if [[ -f "$SCRIPT_DIR/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+  mkdir -p "$HOME/powerlevel10k"
+  cp -r "$SCRIPT_DIR/powerlevel10k/." "$HOME/powerlevel10k/"
+elif [[ -f "$HOME/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+  info "Using the existing Powerlevel10k theme."
 else
-  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/powerlevel10k
+  p10k_staging=$(mktemp -d)
+  if git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$p10k_staging/theme"; then
+    if [[ -e "$HOME/powerlevel10k" ]]; then
+      mv "$HOME/powerlevel10k" "$HOME/powerlevel10k.backup-$(date +%Y%m%d-%H%M%S)"
+    fi
+    mv "$p10k_staging/theme" "$HOME/powerlevel10k"
+    success "Powerlevel10k downloaded."
+  else
+    warn "Powerlevel10k download failed; Zsh will use its default prompt."
+  fi
+  rm -rf "$p10k_staging"
 fi
-success "Powerlevel10k configured."
 
-if [[ -f "$SCRIPT_DIR/dotfiles/.zshrc" ]]; then
-  cp "$SCRIPT_DIR/dotfiles/.zshrc" ~/.zshrc
-fi
-if [[ -f "$SCRIPT_DIR/dotfiles/.p10k.zsh" ]]; then
-  cp "$SCRIPT_DIR/dotfiles/.p10k.zsh" ~/.p10k.zsh
-fi
+zsh_backup="$HOME/.local/state/hyprland-setup/zsh/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$zsh_backup"
+for dotfile in .zshrc .p10k.zsh; do
+  if [[ -f "$SCRIPT_DIR/dotfiles/$dotfile" ]]; then
+    [[ ! -e "$HOME/$dotfile" ]] || cp -a "$HOME/$dotfile" "$zsh_backup/$dotfile"
+    cp "$SCRIPT_DIR/dotfiles/$dotfile" "$HOME/$dotfile"
+  fi
+done
 
-if [[ "$SHELL" != "$(which zsh)" ]]; then
-  info "Changing default shell to ZSH..."
-  chsh -s "$(which zsh)"
-  success "Default shell changed to ZSH. Will take effect upon next login."
+if command -v zsh >/dev/null; then
+  zsh_path=$(command -v zsh)
+  if [[ "${SHELL:-}" != "$zsh_path" ]]; then
+    info "Changing the default shell to Zsh..."
+    chsh -s "$zsh_path" || warn "Could not change the login shell. Run chsh manually after installation."
+  fi
+else
+  warn "Zsh was not installed; the login shell was left unchanged."
 fi
 
 # =============================================================================
 # INSTALL CELESTIAL SDDM THEME
 # =============================================================================
 
+installer_stage "Configure the login screen"
 info "Setting up celestial-sddm..."
 mkdir -p ~/Projects/sddm
 SDDM_SOURCE="$SCRIPT_DIR/sddm/celestial-sddm"
@@ -905,16 +907,16 @@ EOF
   # GRUB configuration removed as the user uses systemd-boot
 }
 
+installer_stage "Configure the boot screen"
 configure_bootloader_and_plymouth
 
 # =============================================================================
 # INSTALLATION COMPLETE
 # =============================================================================
 
+installer_stage "Installation complete"
 echo ""
-echo -e "${GREEN}${BOLD}======================================================${RESET}"
-echo -e "${GREEN}${BOLD}     HYPRLAND INSTALLATION COMPLETED SUCCESSFULLY!   ${RESET}"
-echo -e "${GREEN}${BOLD}======================================================${RESET}"
+success "Hyprland setup finished. Review any warnings above before rebooting."
 echo ""
 read -rp "  Do you want to reboot the system now? [Y/n]: " REBOOT_CHOICE
 REBOOT_CHOICE="${REBOOT_CHOICE:-Y}"

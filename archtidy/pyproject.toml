@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "archtidy"
+version = "1.0.0"
+description = "Unified System Cleaner for Arch Linux"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Core System Integrator" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+tui = [
+    "rich>=13.0.0",
+    "textual>=0.50.0"
+]
+
+[project.scripts]
+archtidy = "archtidy.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["archtidy*"]

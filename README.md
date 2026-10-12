@@ -26,6 +26,18 @@ chmod +x install.sh
 
 > Do not run the script as root.
 
+The installer uses one full-screen terminal for package selection, downloads,
+builds, and configuration. In an existing Hyprland session it expands only the
+terminal running setup and restores that window when the installer exits.
+On a TTY or another desktop it uses the available terminal size. Package
+checklists fill the terminal; retry output remains visible and records the
+actual command exit status. Cancelling a checklist selects no packages.
+
+The installer needs `sudo`, `pacman`, `curl`, and `git`. Network checks do not
+rewrite or lock your DNS configuration. Existing Zsh/Powerlevel10k and Neovim
+configuration is backed up when replaced. Snapper setup runs only on Btrfs and
+preserves an existing root configuration.
+
 The recommended package selection includes the viewers and Quickshell. If an
 application is deselected or fails to install, its file associations are skipped.
 
@@ -68,42 +80,44 @@ Configuration: `config/quickshell/workspace-preview/shell.qml`. Both the Lua and
 legacy Hyprland configs launch the preview automatically on login. It can also
 be started with `~/.config/quickshell/workspace-preview/start.sh`.
 
-New Zsh terminals include `status`, an alias for `fastfetch -l arch2`.
+New Zsh terminals include `status`, an alias for `fastfetch -l arch2` when
+fastfetch is installed. Startup tolerates missing optional themes/plugins,
+uses standard `ls` aliases when eza is absent, and adds `~/.local/bin` only once.
+Syntax highlighting loads last, after completion and key bindings.
 
-`Mod + I` opens a 320×380 popup with a compact grid of round icon buttons and names
-below: Wi-Fi, Bluetooth, Ethernet, Hotspot, Wireless, VPN, and Airplane.
-The window keeps the same size across the chooser, lists, and detail pages;
-long content scrolls within the panel. Choose Wi-Fi or Bluetooth to
-open its searchable list with automatic refresh and a radio switch. Wi-Fi signal
-strength uses icons without percentages. Bluetooth discovery runs while its page
-is open and stops when leaving it. Escape returns to the chooser, then closes it;
-Mod + I toggles the popup. Details, action menus, and password prompts stay inside
-the same window, with labeled detail rows and separators. The interface is English.
-Mod + P still opens the monitor menu.
+`Mod + I` opens an 860×520 connection panel with a clean list of connections:
+Wi-Fi, Bluetooth, Ethernet, Hotspot, VPN, Airplane Mode, and Wireless Debugging.
+Hotspot and Wireless Debugging pages become compact when no QR is active and
+expand when a QR is ready. Content uses a single scrollbar. Action buttons (Rescan, Saved, Settings,
+Pairing) appear in the relevant toolbar or page card. Cancel is shown while an
+operation is running, and details use Back/Esc.
 
-- Wi-Fi: radio toggle, signal/security indicators, rescan, password prompt,
-  disconnect, saved profiles, and connection details.
-- Bluetooth: radio toggle, paired devices, connect/disconnect, forget, and battery
-  level when reported. Discovery runs in the panel; pairing/PIN confirmation opens
-  the Blueman authentication agent when required.
-- Ethernet: connection controls and IP/DNS details. VPN: connect/disconnect through
-  the official Proton VPN CLI using Automatic, without opening the app. Select a
-  saved server to connect through NetworkManager instead. Add server imports a
-  [Proton WireGuard configuration](https://protonvpn.com/support/wireguard-configurations)
-  downloaded from your account and labels it with your chosen server name.
-  Proton Free does not allow manual server selection through its CLI; the manual
-  list requires these configuration files. Imported servers do not auto-connect.
-- Airplane mode: Enable or Disable Wi-Fi and Bluetooth together. Hotspot: supported
-  adapters only, a custom SSID and password, stop/edit controls. An adapter already
-  connected to Wi-Fi is not reused. Same-adapter Wi-Fi sharing needs a virtual AP
-  interface, which the panel does not yet configure. Use another adapter or a LAN
-  upstream connection. Existing profiles are preserved; passwords use stdin.
-- Advanced and enterprise Wi-Fi settings open NetworkManager's connection editor.
-- Wireless debugging: Android ADB pairing code, connect by IP/port, device status,
-  disconnect, and launch scrcpy for a selected device. Pairing codes are passed
-  through stdin, never command arguments. The pairing and connection ports can
-  differ; use the addresses displayed on the corresponding Android screen.
-  See [Android's wireless ADB guide](https://developer.android.com/tools/adb#wireless-android11-command-line).
+- Wi-Fi: radio toggle, signal indicators, top toolbar actions (rescan, saved profiles,
+  settings), password prompt with eye toggle, lock badges on Wi-Fi icons, a browser Login
+  button when a connected network is detected as a captive portal, and QR Code
+  sharing for phone scanning, clean disconnect, and connection details.
+- Bluetooth: radio toggle, paired devices list, top toolbar rescan/settings icons,
+  automatic device trust for headsets and TWS earbuds, and battery level reporting.
+- Ethernet: clean disconnect/reconnect controls and IP/DNS details.
+- VPN: connect/disconnect through Proton VPN CLI using Automatic, or select a free
+  server (Singapore, Netherlands, Japan, United States) or custom WireGuard configs.
+- Airplane mode: Enable or Disable all wireless hardware via rfkill and radio controls.
+- Hotspot: Status toggle and credentials editor, with a large QR shown only when
+  the hotspot is active and credentials match. Preserves the existing Wi-Fi
+  connection with a separate AP interface when the radio supports concurrency.
+  Same-radio sharing uses hostapd, dnsmasq, and isolated firewall rules. Starting
+  and stopping requires system authentication with the laptop account password.
+  **Use 2.4 GHz Wi-Fi** appears only when the current channel is restricted;
+  **Sync hotspot password** appears only when old session credentials mismatch.
+- Wireless debugging: A unified pairing card and live connected-device list.
+  QR appears only during an active, ready pairing attempt. Pairing, connection,
+  timeout, and error are separate states. Scan from Developer options → Wireless
+  debugging → Pair device with QR code on the same network. Code pairing and
+  direct IP:port are also available. Arch builds without ADB mDNS use native
+  discovery. Already configured discovery does not request a password; a new
+  firewall zone can require a one-time setup authorization. Connection success
+  requires an ADB shell response. The panel checks again before opening scrcpy
+  and displays failures, with logs in `~/.local/state/hypr-connections/`.
 
 The installer includes NetworkManager, BlueZ, Blueman, nm-connection-editor, the
 official Proton VPN CLI, and Android tools,
@@ -111,6 +125,27 @@ and enables NetworkManager/bluetooth services for the next boot. UI and styling:
 `config/scripts/connections.py`. GTK 3, python-gobject and android-tools are included.
 Hotspot availability is checked against the adapter's NetworkManager AP capability;
 sharing internet requires a reachable upstream connection (Wi-Fi, LAN, or USB tethering).
+
+`Mod + U` or `Mod + Alt + C` opens the graphical ArchTidy panel. Choose a
+category, search or check individual items, then click **Review & clean**.
+The review screen lists every selected path and offers simulation or deletion.
+Nothing is preselected. User files go to Trash; packages and system package
+archives require authentication and are permanently removed. Moving files to
+Trash does not free disk space until Trash is emptied. **Restore last cleanup**
+restores user files from the latest cleanup without overwriting existing files.
+The **Junk only** category includes superseded package archives (keeping two
+versions) and thumbnail caches older than 30 days. It excludes personal files,
+installed packages, and application configuration. All panel text is in English.
+The installer puts ArchTidy in `~/.local/share/archtidy/` with a launcher in
+`~/.local/bin/archtidy`; it works after the checkout is moved or removed.
+Existing `~/.config/archtidy/config.toml` is preserved. The terminal interface
+remains available with `archtidy tui`.
+
+Idle panels close on outside mouse clicks, through non-consuming Hyprland mouse
+bindings and per-panel runtime sockets. Hovering outside does not close them.
+Connections stays open during authentication so a click outside cannot hide a
+running operation. Esc and the close button are also available. See [repair audit](docs/panel-repair-audit.md)
+for validation and hardware limitations.
 
 On a fresh OBS install, the installer creates a **Hyprland Recording** profile:
 1920×1080, 30 FPS, Indistinguishable quality using x264, MKV recordings saved to
@@ -122,7 +157,9 @@ selected in OBS because they depend on the current session and hardware.
 
 ```bash
 python3 -m unittest discover -s tests -v
+PYTHONPATH=archtidy python3 -m unittest discover -s archtidy/tests -v
 bash -n install.sh
+bash -n scripts/installer-ui.sh
 zsh -n dotfiles/.zshrc
 ```
 
@@ -141,6 +178,7 @@ zsh -n dotfiles/.zshrc
 | `Mod + N` | Neovim |
 | `Mod + V` | ProtonVPN |
 | `Mod + P` | Display/Monitor setup |
+| `Mod + U` / `Mod + Alt + C` | Graphical ArchTidy cleaner |
 | `Mod + I` | Connections popup (Wi-Fi, Bluetooth, Ethernet, VPN, hotspot) |
 | `Mod + ↑` | Fullscreen |
 | `Mod + ↓` | Unfullscreen |

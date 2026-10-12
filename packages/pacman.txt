@@ -25,7 +25,7 @@ quickshell
 hyprpicker
 hypridle
 hyprlock
-rofi-wayland
+rofi
 grim
 slurp
 swappy
@@ -50,12 +50,15 @@ playerctl
 
 networkmanager
 iw
+hostapd
 python-gobject
 gtk3
 nm-connection-editor
 bluez
 bluez-utils
 blueman
+qrencode
+python-zeroconf
 
 # =========================
 # FILE MANAGER
@@ -78,7 +81,7 @@ libnotify
 adwaita-icon-theme
 gnome-themes-extra
 vimix-cursors
-ttf-font-awesome
+otf-font-awesome
 ttf-cascadia-code
 ttf-jetbrains-mono-nerd
 noto-fonts
@@ -141,6 +144,7 @@ brightnessctl
 cliphist
 gsettings-desktop-schemas
 polkit-kde-agent
+iptables
 qt5-wayland
 qt6-wayland
 snapper

@@ -1,0 +1,50 @@
+# ArchTidy Configuration
+# Tailored for Arch Linux + Hyprland on Lenovo ThinkPad T14 Gen 2i
+
+[general]
+dry_run_default = true
+use_trash = true
+log_file = "~/.local/state/archtidy/actions.log"
+backup_snapshots = true
+aur_helper = "yay"
+
+[orphans]
+min_confidence_score = 70
+scan_directories = [
+    "~/.config",
+    "~/.cache",
+    "~/.local/share",
+    "~/.local/state"
+]
+
+[bigfiles]
+min_size_mb = 100
+scan_directories = [
+    "~/Downloads",
+    "~/Videos",
+    "~/Pictures",
+    "~/Documents"
+]
+
+[duplicates]
+min_size_mb = 1
+scan_directories = [
+    "~/Downloads",
+    "~/Videos",
+    "~/Pictures"
+]
+
+[blacklist]
+paths = [
+    "~/.ssh",
+    "~/.gnupg",
+    "~/.config/Code/User",
+    "~/.mozilla",
+    "~/.local/share/keyrings",
+    "~/Documents",
+    "~/.password-store",
+    "~/.config/hypr",
+    "~/.git",
+    "~/.local/state/hypr-connections",
+    "~/.local/state/archtidy"
+]

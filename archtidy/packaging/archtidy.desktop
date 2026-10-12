@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ArchTidy
+Comment=Unified System Cleaner for Arch Linux
+Exec=archtidy
+Icon=system-file-manager
+Terminal=false
+Type=Application
+Categories=System;Utility;
+Keywords=clean;cleanup;orphan;cache;trash;disk;pacman;
