@@ -186,6 +186,9 @@ fastfetch is installed. Startup tolerates missing optional themes/plugins,
 uses standard `ls` aliases when eza is absent, and adds `~/.local/bin` only once.
 Syntax highlighting loads last, after completion and key bindings.
 
+Dunst notifications use the same dark background (`#222222`) and gray border
+for low, normal, and critical urgency, matching the volume and brightness OSD.
+
 `Mod + I` opens an 860×520 connection panel with a clean list of connections:
 Wi-Fi, Bluetooth, Ethernet, Hotspot, VPN, Airplane Mode, and Wireless Debugging.
 Hotspot and Wireless Debugging pages become compact when no QR is active and

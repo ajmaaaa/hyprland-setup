@@ -18,9 +18,9 @@ try:
         wireless = [d for d in devices if d[3]]
         choices = wireless or devices
         if not choices:
-            raise RuntimeError('Belum ada HP terhubung. Connect Wireless debugging dulu, lalu jalankan scrcpy-hp.')
+            raise RuntimeError('No phone is connected. Connect Wireless debugging first, then run scrcpy-hp.')
         if len(choices) != 1:
-            raise RuntimeError('Ada beberapa HP terhubung. Pilih dengan: scrcpy-hp ADB_SERIAL (lihat adb devices).')
+            raise RuntimeError('Multiple phones are connected. Select one with: scrcpy-hp ADB_SERIAL (see adb devices).')
         serial = choices[0][0]
     backend.start_scrcpy(serial)
 except RuntimeError as error:

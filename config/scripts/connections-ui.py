@@ -72,14 +72,14 @@ def password_display(password):
     box.pack_start(text, True, True, 0)
     eye = Gtk.ToggleButton()
     eye.set_sensitive(bool(password))
-    eye.set_tooltip_text('Lihat password')
+    eye.set_tooltip_text('Show password')
     icon = Gtk.Image.new_from_icon_name('view-reveal-symbolic', Gtk.IconSize.BUTTON)
     eye.add(icon)
     def toggle(button):
         shown = button.get_active()
         text.set_text(password if shown else '••••••••••••')
         icon.set_from_icon_name('view-conceal-symbolic' if shown else 'view-reveal-symbolic', Gtk.IconSize.BUTTON)
-        button.set_tooltip_text('Sembunyikan password' if shown else 'Lihat password')
+        button.set_tooltip_text('Hide password' if shown else 'Show password')
     eye.connect('toggled', toggle)
     box.pack_end(eye, False, False, 0)
     return box

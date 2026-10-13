@@ -357,6 +357,7 @@
     # This setting overrides enable_posix_regex.
     enable_pcre_regex = false
 
+# Use the same dark background for every notification urgency.
 [urgency_low]
     # IMPORTANT: colors have to be defined in quotation marks.
     # Otherwise the "#" and following would be interpreted as a comment.
@@ -367,7 +368,7 @@
     default_icon = dialog-information
 
 [urgency_normal]
-    background = "#285577"
+    background = "#222222"
     foreground = "#ffffff"
     timeout = 10
     override_pause_level = 30
@@ -375,9 +376,9 @@
     default_icon = dialog-information
 
 [urgency_critical]
-    background = "#900000"
+    background = "#222222"
     foreground = "#ffffff"
-    frame_color = "#ff0000"
+    frame_color = "#aaaaaa"
     timeout = 0
     override_pause_level = 60
     # Icon for notifications with critical urgency
