@@ -66,6 +66,17 @@ def configure(home, system_apps=Path('/usr/share/applications'), refresh=True):
         expected.update(dict.fromkeys(code, 'antigravity-ide.desktop'))
     if has_nvim:
         alternatives.update({mime: ['nvim.desktop'] for mime in code})
+    # Notes open in a small GUI editor, even when an IDE is installed.
+    text_editor = 'org.xfce.mousepad.desktop'
+    if available(text_editor):
+        notes = {'text/plain', 'text/markdown', 'text/x-markdown'}
+        desktop = read_ini(system_apps / text_editor)
+        desktop['Desktop Entry']['MimeType'] = ';'.join(sorted(notes | supported(text_editor))) + ';'
+        write(apps / text_editor, serialize(desktop))
+        expected.update(dict.fromkeys(notes, text_editor))
+        if has_editor:
+            for mime in notes:
+                alternatives.setdefault(mime, []).insert(0, 'antigravity-ide.desktop')
     for name, predicate in (
         ('mpv.desktop', lambda m: m.startswith(('audio/', 'video/')) or m in {
             'application/ogg', 'application/x-ogg', 'application/x-matroska',

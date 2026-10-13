@@ -166,6 +166,35 @@ class DesktopSetupTest(unittest.TestCase):
         self.assertEqual(p['Default Applications']['text/plain'], 'existing.desktop;')
         self.assertEqual(p['Added Associations']['text/plain'], 'nvim.desktop;')
 
+    def test_mousepad_opens_notes_while_code_keeps_ide_and_open_with_choices(self):
+        self.app('org.xfce.mousepad.desktop', 'text/plain;')
+        self.app('antigravity-ide.desktop', 'text/x-python;')
+        self.app('nvim.desktop')
+        self.app('Alacritty.desktop')
+        specific = self.home / '.config/hyprland-mimeapps.list'
+        specific.write_text('[Default Applications]\ntext/plain=antigravity-ide.desktop;\n'
+            '[Added Associations]\ntext/plain=custom.desktop;\n')
+        expected = viewers.configure(self.home, self.apps, False)
+        for mime in ('text/plain', 'text/markdown', 'text/x-markdown'):
+            self.assertEqual(expected[mime], 'org.xfce.mousepad.desktop')
+        self.assertEqual(expected['text/x-python'], 'antigravity-ide.desktop')
+        for path in (specific, self.home / '.config/mimeapps.list'):
+            p = viewers.read_ini(path)
+            self.assertEqual(p['Default Applications']['text/plain'], 'org.xfce.mousepad.desktop;')
+            self.assertIn('antigravity-ide.desktop;', p['Added Associations']['text/plain'])
+            self.assertIn('nvim.desktop;', p['Added Associations']['text/plain'])
+        self.assertIn('custom.desktop;', viewers.read_ini(specific)['Added Associations']['text/plain'])
+        desktop = viewers.read_ini(self.home / '.local/share/applications/org.xfce.mousepad.desktop')
+        self.assertIn('text/markdown;', desktop['Desktop Entry']['MimeType'])
+        self.assertEqual(desktop['Desktop Entry']['Exec'], 'example %F')
+
+    def test_mousepad_notes_work_without_an_ide(self):
+        self.app('org.xfce.mousepad.desktop', 'text/plain;')
+        expected = viewers.configure(self.home, self.apps, False)
+        self.assertEqual(expected['text/plain'], 'org.xfce.mousepad.desktop')
+        self.assertEqual(expected['text/markdown'], 'org.xfce.mousepad.desktop')
+        self.assertNotIn('text/x-python', expected)
+
     def test_obs_fresh_install_and_existing_profile(self):
         self.assertTrue(obs.configure(self.home))
         profile = self.home / '.config/obs-studio/basic/profiles/Hyprland/basic.ini'
