@@ -212,8 +212,12 @@ operation is running, and details use Back/Esc.
   **Sync hotspot password** appears only when old session credentials mismatch.
 - Wireless debugging: A unified pairing card and live connected-device list.
   Scan the panel QR from **Pair device with QR code** on the phone to pair,
-  connect, and open scrcpy automatically. Click a connected-device row to open
-  its screen directly; its only side action is **Disconnect**, which keeps pairing.
+  and connect without automatically opening scrcpy. Click a connected-device row
+  or run `scrcpy-hp` to open its screen; its only side action is **Disconnect**, which keeps pairing.
+  The scrcpy window starts at the right edge, spans the full monitor height,
+  and keeps a fixed portrait width (45% of its height). Move it with Super +
+  left-button drag; resizing and maximize/fullscreen requests are constrained.
+  Use `scrcpy-hp ADB_SERIAL` when multiple phones are connected.
   There is no device details or rename page. Manual pairing/connection controls
   appear only when QR discovery fails or the connection needs recovery.
   QR appears only during an active, ready pairing attempt. Pairing, connection,

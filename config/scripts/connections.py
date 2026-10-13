@@ -1215,7 +1215,8 @@ def start_scrcpy(serial):
     log_path = STATE_DIR / 'scrcpy-last.log'
     with log_path.open('w') as log:
         log_path.chmod(0o600)
-        args = ['scrcpy', '-s', serial]
+        args = ['scrcpy', '-s', serial, '--window-title=Phone · scrcpy',
+                '--window-width=486', '--window-height=1080']
         if shutil.which('stdbuf'):
             args = ['stdbuf', '-oL', '-eL', *args]
         process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=log,
@@ -1535,7 +1536,7 @@ class AdbQrSession:
                         except RuntimeError:
                             # The connection service may appear before its transport is ready.
                             continue
-                        self.update('connected', f'{model} connected and responding to ADB. Opening its screen…', serial=endpoint)
+                        self.update('connected', f'{model} connected and responding to ADB. Click the device to open its screen.', serial=endpoint)
                         return
                 if self.operation.cancelled.wait(.5):
                     raise OperationCancelled()

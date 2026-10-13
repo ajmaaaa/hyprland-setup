@@ -435,6 +435,8 @@ echo "dark" > "$HOME/.config/hypr/scripts/state/state_theme"
 if [[ -d "$SCRIPT_DIR/config/scripts" ]]; then
   cp -r "$SCRIPT_DIR/config/scripts/." "$HOME/.config/hypr/scripts/"
   chmod +x "$HOME"/.config/hypr/scripts/*.sh 2>/dev/null || true
+  mkdir -p "$HOME/.local/bin"
+  install -m 755 "$SCRIPT_DIR/config/scripts/scrcpy-hp" "$HOME/.local/bin/scrcpy-hp"
   success "Hyprland scripts copied and made executable."
 fi
 

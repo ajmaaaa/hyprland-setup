@@ -124,7 +124,6 @@ class Panel(Gtk.ApplicationWindow):
         self.busy = False
         self.operation = None
         self.adb_session = None
-        self.adb_screen_started = None
         self.adb_devices_snapshot = []
         self.discovery = None
         self.discovery_lock = threading.Lock()
@@ -665,7 +664,6 @@ class Panel(Gtk.ApplicationWindow):
         if self.busy or (self.adb_session and self.adb_session.snapshot()['active']):
             return
         try:
-            self.adb_screen_started = None
             self.adb_session = backend.AdbQrSession(on_change=lambda: GLib.idle_add(self.adb_pairing_changed))
             self.adb_session.start()
             self.render_adb_page(self.adb_devices_snapshot)
@@ -677,10 +675,6 @@ class Panel(Gtk.ApplicationWindow):
             if self.adb_session.snapshot()['state'] == 'connected':
                 self.snapshot = None
                 self.refresh()
-                serial = self.adb_session.snapshot().get('serial')
-                if serial and self.adb_screen_started != serial:
-                    self.adb_screen_started = serial
-                    self.perform(lambda serial=serial: backend.start_scrcpy(serial))
             else:
                 self.render_adb_page(self.adb_devices_snapshot)
         return False
@@ -721,7 +715,7 @@ class Panel(Gtk.ApplicationWindow):
         status = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         status.get_style_context().add_class('card-box')
         status.pack_start(label('Pair an Android device', 'section'), False, False, 0)
-        instructions = label(session['message'] or 'Connect your phone and laptop to the same Wi-Fi. Scan the QR code from Wireless debugging to pair, connect, and open your screen.', 'subtitle')
+        instructions = label(session['message'] or 'Connect your phone and laptop to the same Wi-Fi. Scan the QR code from Wireless debugging to pair and connect. Click a connected device when you want to open its screen.', 'subtitle')
         instructions.set_line_wrap(True)
         instructions.set_max_width_chars(46)
         status.pack_start(instructions, False, False, 0)

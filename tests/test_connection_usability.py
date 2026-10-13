@@ -153,17 +153,19 @@ class PanelUsabilityTests(unittest.TestCase):
             next(w for w in buttons if w.get_label() == 'Disconnect').clicked()
             disconnect.assert_called_once_with(serial)
 
-    def test_qr_completion_opens_the_selected_screen_only_once(self):
+    def test_qr_completion_refreshes_without_opening_screen(self):
         from types import SimpleNamespace
         serial = '192.168.1.7:41234'
         self.panel.page = 'adb'
         self.panel.adb_session = SimpleNamespace(snapshot=lambda: {'state': 'connected', 'serial': serial}, stop=lambda: None)
-        with patch.object(self.panel, 'refresh'), \
-             patch.object(self.panel, 'perform', side_effect=lambda callback: callback()), \
+        with patch.object(self.panel, 'refresh') as refresh, \
+             patch.object(self.panel, 'perform') as perform, \
              patch.object(self.ui.backend, 'start_scrcpy') as mirror:
             self.panel.adb_pairing_changed()
             self.panel.adb_pairing_changed()
-        mirror.assert_called_once_with(serial)
+        self.assertEqual(refresh.call_count, 2)
+        perform.assert_not_called()
+        mirror.assert_not_called()
 
     def test_offline_phone_cannot_start_scrcpy_but_can_be_disconnected(self):
         self.panel.render_adb_page([('192.168.1.7:41234', 'Samsung A13', 'offline', True)])

@@ -215,6 +215,19 @@ for _, match in ipairs({
     })
 end
 
+-- Phone mirror: fixed portrait size, starts on the right, remains draggable.
+hl.window_rule({
+    match = { class = "^(scrcpy)$" },
+    float = true,
+    size = { "monitor_h*0.45", "monitor_h" },
+    min_size = { "monitor_h*0.45", "monitor_h" },
+    max_size = { "monitor_h*0.45", "monitor_h" },
+    move = { "monitor_w-window_w", 0 },
+    border_size = 0,
+    rounding = 0,
+    suppress_event = "maximize fullscreen",
+})
+
 -- Popups
 hl.window_rule({ match = { class = "^(local\\.hyprland\\.Connections|hypr-connections)$" }, float = true, center = true })
 hl.window_rule({ match = { class = "^(pavucontrol)$" }, float = true })

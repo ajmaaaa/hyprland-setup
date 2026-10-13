@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Open a connected phone using the shared scrcpy launcher."""
+import importlib.util
+from pathlib import Path
+import sys
+
+spec = importlib.util.spec_from_file_location('connections', Path.home() / '.config/hypr/scripts/connections.py')
+backend = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(backend)
+
+try:
+    if len(sys.argv) > 2:
+        raise RuntimeError('Usage: scrcpy-hp [ADB_SERIAL]')
+    if len(sys.argv) == 2:
+        serial = sys.argv[1]
+    else:
+        devices = [d for d in backend.adb_devices() if d[2] == 'device']
+        wireless = [d for d in devices if d[3]]
+        choices = wireless or devices
+        if not choices:
+            raise RuntimeError('Belum ada HP terhubung. Connect Wireless debugging dulu, lalu jalankan scrcpy-hp.')
+        if len(choices) != 1:
+            raise RuntimeError('Ada beberapa HP terhubung. Pilih dengan: scrcpy-hp ADB_SERIAL (lihat adb devices).')
+        serial = choices[0][0]
+    backend.start_scrcpy(serial)
+except RuntimeError as error:
+    print(str(error), file=sys.stderr)
+    sys.exit(1)
