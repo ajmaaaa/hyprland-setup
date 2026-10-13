@@ -78,6 +78,9 @@ hl.config({
             inactive_border = "rgba(333333ff)", -- Sway grey inactive border
         },
         layout = "dwindle",
+        -- Grabbing a floating window's edge with the cursor resizes it, so no
+        -- modifier is needed on top of the SUPER + right-drag resize bind.
+        resize_on_border = true,
     },
     decoration = {
         rounding = 8,
