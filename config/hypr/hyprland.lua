@@ -229,6 +229,23 @@ hl.window_rule({
 })
 
 -- Popups
+-- Compositor resize dispatchers can bypass client size hints; restore only size.
+hl.timer(function()
+    for _, window in ipairs(hl.get_windows({ class = "^scrcpy$" })) do
+        local monitor = window.monitor
+        if monitor and window.floating then
+            local height = math.floor(monitor.height / monitor.scale)
+            if (monitor.transform or 0) % 2 == 1 then
+                height = math.floor(monitor.width / monitor.scale)
+            end
+            local width = math.floor(height * 0.45)
+            if window.size.width ~= width or window.size.height ~= height then
+                hl.dispatch(hl.dsp.window.resize({ window = window, x = width, y = height, relative = false }))
+            end
+        end
+    end
+end, { timeout = 150, type = "repeat" })
+
 hl.window_rule({ match = { class = "^(local\\.hyprland\\.Connections|hypr-connections)$" }, float = true, center = true })
 hl.window_rule({ match = { class = "^(pavucontrol)$" }, float = true })
 hl.window_rule({ match = { class = "^(blueman-manager)$" }, float = true })
@@ -246,8 +263,16 @@ hl.window_rule({ match = { class = "^(dolphin)$" }, opacity = "0.95 0.90" })
 --  KEYBINDINGS
 -- ------------------------------------------------------------
 -- Mouse bindings
+local function resizable_window_action(action)
+    return function()
+        local window = hl.get_active_window()
+        if not window or window.class ~= "scrcpy" then
+            hl.dispatch(action)
+        end
+    end
+end
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+hl.bind(mainMod .. " + mouse:273", resizable_window_action(hl.dsp.window.resize()), { mouse = true })
 
 -- Applications
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(term))
@@ -318,8 +343,8 @@ hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 hl.bind(mainMod .. " + ALT + V", hl.dsp.layout("togglesplit"))
 
 -- Floating & Fullscreen
-hl.bind(mainMod .. " + SHIFT + Space", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + SHIFT + F",     hl.dsp.window.fullscreen({ action = "toggle" }))
+hl.bind(mainMod .. " + SHIFT + Space", resizable_window_action(hl.dsp.window.float({ action = "toggle" })))
+hl.bind(mainMod .. " + SHIFT + F",     resizable_window_action(hl.dsp.window.fullscreen({ action = "toggle" })))
 
 -- Scratchpad
 hl.bind(mainMod .. " + minus",       hl.dsp.workspace.toggle_special("magic"))
