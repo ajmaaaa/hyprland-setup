@@ -387,6 +387,16 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   fi
 fi
 
+# WPS needs its symbol fonts in addition to the Microsoft core fonts.
+if pacman -Q wps-office &>/dev/null; then
+  if ! pacman -Q ttf-wps-fonts &>/dev/null; then
+    warn "WPS symbol fonts are missing. Install them with: yay -S --needed ttf-wps-fonts"
+  fi
+  if command -v fc-cache &>/dev/null && ! fc-cache -f; then
+    warn "Font cache refresh failed. Rerun: fc-cache -f"
+  fi
+fi
+
 # =============================================================================
 # INSTALL NPM PACKAGES
 # =============================================================================

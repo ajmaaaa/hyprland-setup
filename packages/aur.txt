@@ -39,3 +39,4 @@ antigravity-ide
 # =========================
 
 ttf-ms-fonts
+ttf-wps-fonts

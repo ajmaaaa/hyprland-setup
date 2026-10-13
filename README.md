@@ -26,6 +26,11 @@ chmod +x install.sh
 
 > Do not run the script as root.
 
+Recommended AUR packages include `ttf-wps-fonts` for WPS Office's Symbol,
+Wingdings, and formula fonts, alongside `ttf-ms-fonts`. The installer refreshes
+the font cache when WPS is installed and warns if its symbol-font package is
+missing. Restart an already-running WPS instance after installing the fonts.
+
 The installer uses one full-screen terminal for package selection, downloads,
 builds, and configuration. In an existing Hyprland session it expands only the
 terminal running setup and restores that window when the installer exits.
