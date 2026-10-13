@@ -54,6 +54,13 @@ scrollbar.vertical { margin: 2px 0 2px 4px; }
 scrollbar.vertical slider { min-width: 6px; border-radius: 4px; }
 '''
 
+# Every page uses this size, so moving between the category list, the hotspot page
+# and the wireless-debugging page never resizes the window. The hotspot content is
+# kept within this height so its QR code, credentials, warnings and edit form all
+# fit without scrolling; only a long debugging device list scrolls, since it grows
+# with the number of connected phones.
+PANEL_SIZE = (860, 520)
+
 
 def label(text, style=None):
     widget = Gtk.Label(label=text, xalign=0)
@@ -112,7 +119,7 @@ def qr_icon_pixbuf(size=18):
 class Panel(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title='Connections')
-        self.set_default_size(860, 520)
+        self.set_default_size(*PANEL_SIZE)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_resizable(True)
         self.set_decorated(False)
@@ -218,7 +225,9 @@ class Panel(Gtk.ApplicationWindow):
         hotspot_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.hotspot_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
         self.hotspot_box.set_border_width(4)
-        self.hotspot_box.set_valign(Gtk.Align.START)
+        # Fill the page so the cards can stretch to the bottom instead of leaving
+        # an empty band under them.
+        self.hotspot_box.set_valign(Gtk.Align.FILL)
         hotspot_scroll.add(self.hotspot_box)
         self.stack.add_named(hotspot_scroll, 'hotspot')
 
@@ -226,7 +235,7 @@ class Panel(Gtk.ApplicationWindow):
         adb_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.adb_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
         self.adb_box.set_border_width(4)
-        self.adb_box.set_valign(Gtk.Align.START)
+        self.adb_box.set_valign(Gtk.Align.FILL)
         adb_scroll.add(self.adb_box)
         self.stack.add_named(adb_scroll, 'adb')
 
@@ -319,8 +328,7 @@ class Panel(Gtk.ApplicationWindow):
         self.heading.set_text(titles.get(self.page, 'Connections'))
         self.state.set_text('Loading…' if self.page not in ('home', 'hotspot') else '')
         self.state.set_visible(self.page not in ('home', 'hotspot', 'adb'))
-        if self.page not in ('hotspot', 'adb'):
-            self.resize_panel(860, 520)
+        self.resize_panel(*PANEL_SIZE)
 
         if self.page == 'wifi':
             self.search.set_placeholder_text('Search networks…')
@@ -730,7 +738,7 @@ class Panel(Gtk.ApplicationWindow):
                 button.connect('clicked', lambda _, cb=callback: self.perform(cb))
                 alternatives.pack_start(button, True, True, 0)
             status.pack_start(alternatives, False, False, 0)
-        right.pack_start(status, False, False, 0)
+        right.pack_start(status, True, True, 0)
 
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         card.get_style_context().add_class('card-box')
@@ -749,10 +757,9 @@ class Panel(Gtk.ApplicationWindow):
             card.pack_start(listing, False, False, 0)
         else:
             card.pack_start(label('No devices connected yet.', 'subtitle'), False, False, 0)
-        right.pack_start(card, False, False, 0)
+        right.pack_start(card, True, True, 0)
         self.adb_box.pack_start(right, True, True, 0)
         self.adb_box.show_all()
-        self.resize_panel(860 if svg else 620, 430)
 
     def render_hotspot_page(self):
         info = backend.get_hotspot_status()
@@ -807,7 +814,7 @@ class Panel(Gtk.ApplicationWindow):
         # Right Pane: Status & Credentials
         right_pane = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         right_pane.set_hexpand(True)
-        right_pane.set_valign(Gtk.Align.START)
+        right_pane.set_valign(Gtk.Align.FILL)
 
         status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         status_card.get_style_context().add_class('card-box')
@@ -815,16 +822,22 @@ class Panel(Gtk.ApplicationWindow):
         status_title = label('Wi-Fi Hotspot', 'section')
         status_card.pack_start(status_title, False, False, 0)
 
-        note = label('Share your laptop\'s internet connection with other devices.', 'subtitle')
-        note.set_line_wrap(True)
-        note.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
-        status_card.pack_start(note, False, False, 0)
+        # The band-switch warning explains the situation on its own, so the generic
+        # description is dropped in that state to keep the page on one screen.
+        if not info['needs_band_switch']:
+            note = label('Share your laptop\'s internet connection with other devices.', 'subtitle')
+            note.set_line_wrap(True)
+            note.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            status_card.pack_start(note, False, False, 0)
         if is_active and info.get('credentials_mismatch'):
             sync = Gtk.Button(label='Sync hotspot password')
             sync.connect('clicked', lambda *_: self.perform(backend.sync_native_hotspot_credentials))
             status_card.pack_start(sync, False, False, 0)
         if info['needs_band_switch']:
-            status_card.pack_start(label('The current Wi-Fi channel does not support hotspot mode. Switch to 2.4 GHz to continue.', 'subtitle'), False, False, 0)
+            warning = label('This Wi-Fi channel cannot host an access point. Switch to 2.4 GHz.', 'subtitle')
+            warning.set_line_wrap(True)
+            warning.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            status_card.pack_start(warning, False, False, 0)
             use24 = Gtk.Button(label='Use 2.4 GHz Wi-Fi')
             use24.set_tooltip_text('Reconnect to the same Wi-Fi network on 2.4 GHz. The connection will pause briefly.')
             use24.connect('clicked', lambda *_: self.perform(backend.use_24ghz_uplink))
@@ -843,7 +856,7 @@ class Panel(Gtk.ApplicationWindow):
                 self.perform(backend.turn_on_hotspot)
         toggle_btn.connect('clicked', on_toggle_hotspot)
         status_card.pack_start(toggle_btn, False, False, 4)
-        right_pane.pack_start(status_card, False, False, 0)
+        right_pane.pack_start(status_card, True, True, 0)
 
         # Credentials card
         cred_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -893,10 +906,12 @@ class Panel(Gtk.ApplicationWindow):
         view_box.pack_start(pwd_row, False, False, 0)
         cred_card.pack_start(view_box, False, False, 0)
 
-        # Edit box (hidden initially, with Save and Cancel buttons)
+        # Edit box (hidden initially, with Save and Cancel buttons). It stays part
+        # of the normal widget tree so show_all() also realises the entries below;
+        # the box itself is hidden again at the end of the render. Using
+        # set_no_show_all() here left the entries unmapped, so the pencil button
+        # opened an empty form and the password could not be typed.
         edit_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        edit_box.set_no_show_all(True)
-        edit_box.hide()
 
         edit_title = label('Edit Hotspot Settings', 'section')
         edit_box.pack_start(edit_title, False, False, 0)
@@ -959,8 +974,12 @@ class Panel(Gtk.ApplicationWindow):
             edit_box.hide()
             cred_header.show()
             view_box.show()
+            status_card.show()
 
         def on_edit_clicked(*_):
+            # The edit form takes the place of the status card, so the page keeps
+            # fitting the fixed panel size without a scrollbar.
+            status_card.hide()
             cred_header.hide()
             view_box.hide()
             edit_box.show()
@@ -974,11 +993,12 @@ class Panel(Gtk.ApplicationWindow):
         edit_box.pack_start(action_btns, False, False, 4)
         cred_card.pack_start(edit_box, False, False, 0)
 
-        right_pane.pack_start(cred_card, False, False, 0)
+        right_pane.pack_start(cred_card, True, True, 0)
         self.hotspot_box.pack_start(right_pane, True, True, 0)
         self.hotspot_box.show_all()
-        width, height = (860, 400) if svg else (620, 360)
-        self.resize_panel(width, height)
+        # show_all() realises the editor's entries; hide the form itself so the
+        # credentials stay visible until the pencil button is pressed.
+        edit_box.hide()
 
     def resize_panel(self, width, height):
         self.set_default_size(width, height)
