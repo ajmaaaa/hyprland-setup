@@ -202,11 +202,18 @@ hl.window_rule({ match = { class = "^(PacketTracer)$" }, float = true, rounding 
 hl.window_rule({ match = { class = "^(PacketTracer)$", title = "^(Cisco Packet Tracer)$" }, tile = true })
 
 -- Desktop Portals & Dialogs
-hl.window_rule({ match = { class = "^(xdg-desktop-portal-gtk)$" }, float = true })
-hl.window_rule({ match = { title = "^(Open File)(.*)$" }, float = true })
-hl.window_rule({ match = { title = "^(Select a File)(.*)$" }, float = true })
-hl.window_rule({ match = { title = "^(Choose wallpaper)(.*)$" }, float = true })
-hl.window_rule({ match = { title = "^(Save File)(.*)$" }, float = true })
+-- Monitor-relative sizing and centering also work above two tiled windows.
+for _, match in ipairs({
+    { class = "^(xdg-desktop-portal-gtk|org\\.freedesktop\\.impl\\.portal\\.desktop\\.kde)$" },
+    { title = "^(File Upload|Open File|Open Folder|Select a File|Select Folder|Choose wallpaper|Save File|Save As)(.*)$" },
+}) do
+    hl.window_rule({
+        match = match, float = true, center = true,
+        size = { "monitor_w*0.6", "monitor_h*0.6" },
+        max_size = { "monitor_w*0.85", "monitor_h*0.85" },
+        suppress_event = "maximize fullscreen",
+    })
+end
 
 -- Popups
 hl.window_rule({ match = { class = "^(local\\.hyprland\\.Connections|hypr-connections)$" }, float = true, center = true })

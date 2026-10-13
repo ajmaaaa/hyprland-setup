@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,10 +18,45 @@ def load(name):
 
 viewers = load('setup-viewers')
 obs = load('setup-obs')
+places = load('setup-places')
 zen = load('setup-zen')
 
 
 class DesktopSetupTest(unittest.TestCase):
+    def test_places_merge_preserves_custom_bookmarks_and_repeated_runs(self):
+        gtk = self.home / '.config/gtk-3.0/bookmarks'
+        gtk.parent.mkdir(parents=True)
+        download_uri = (self.home / 'Downloads').as_uri()
+        gtk.write_text(f'file:///custom Custom\n{download_uri} My downloads\n')
+        kde = self.home / '.local/share/user-places.xbel'
+        kde.parent.mkdir(parents=True)
+        kde.write_text('<xbel><bookmark href="sftp://server/files"><title>Server</title></bookmark>'
+            f'<bookmark href="{download_uri}"><title>My downloads</title><info>'
+            '<metadata owner="http://www.kde.org"><isHidden>true</isHidden>'
+            '<OnlyInApp>other-app</OnlyInApp></metadata></info></bookmark></xbel>')
+        places.configure(self.home)
+        root = ET.parse(kde).getroot()
+        self.assertEqual(root.find('bookmark/title').text, 'Server')
+        downloads = next(b for b in root.findall('bookmark') if b.get('href') == download_uri)
+        self.assertEqual(downloads.find('title').text, 'My downloads')
+        self.assertEqual(downloads.find('info/metadata/isHidden').text, 'false')
+        self.assertIsNone(downloads.find('info/metadata/OnlyInApp'))
+        for name, _ in places.FOLDERS:
+            folder = self.home / name
+            self.assertTrue(folder.is_dir())
+            self.assertEqual(len([b for b in root.findall('bookmark') if b.get('href') == folder.as_uri()]), 1)
+            for version in ('gtk-3.0', 'gtk-4.0'):
+                lines = (self.home / '.config' / version / 'bookmarks').read_text().splitlines()
+                self.assertEqual(sum(line.split(' ', 1)[0] == folder.as_uri() for line in lines), 1)
+        self.assertTrue(gtk.read_text().startswith('file:///custom Custom\n'))
+        paths = [gtk, kde, self.home / '.config/gtk-4.0/bookmarks']
+        before = {path: path.read_bytes() for path in paths}
+        places.configure(self.home)
+        for path in paths:
+            self.assertEqual(path.read_bytes(), before[path])
+        self.assertEqual(len(list(gtk.parent.glob('bookmarks.backup-*'))), 1)
+        self.assertEqual(len(list(kde.parent.glob('user-places.xbel.backup-*'))), 1)
+
     def test_zen_default_is_false_and_preserves_other_browser_settings(self):
         with tempfile.TemporaryDirectory() as folder:
             installation = Path(folder)
@@ -105,9 +141,45 @@ class DesktopSetupTest(unittest.TestCase):
         self.assertEqual(p['SimpleOutput']['FilePath'], str(self.home / 'Videos/OBS'))
         self.assertEqual(p['SimpleOutput']['RecQuality'], 'HQ')
         self.assertEqual(p['Video']['FPSCommon'], '30')
-        profile.write_text('[General]\nName=My custom profile\n')
         self.assertFalse(obs.configure(self.home))
-        self.assertEqual(profile.read_text(), '[General]\nName=My custom profile\n')
+        self.assertEqual(list(profile.parent.glob('*.backup-*')), [])
+
+    def test_obs_existing_profiles_update_paths_preserve_settings_and_backup(self):
+        original = ('[General]\nName=My custom profile\n'
+            '[Output]\nMode=Advanced\nFilenameFormatting=%CCYY-%MM-%DD\n'
+            '[SimpleOutput]\nFilePath=/old/simple\nRecQuality=Small\n'
+            '[AdvOut]\nRecFilePath=/old/advanced\nFFFilePath=/old/ffmpeg\n'
+            'RecEncoder=obs_x264\nRecFormat2=hybrid_mp4\n'
+            '[Video]\nFPSCommon=60\n')
+        profiles = self.home / '.config/obs-studio/basic/profiles'
+        for name in ('Untitled', 'Streaming'):
+            folder = profiles / name
+            folder.mkdir(parents=True)
+            (folder / 'basic.ini').write_text(original)
+        user = profiles.parents[1] / 'user.ini'
+        user.write_text('[Basic]\nProfileDir=Untitled\n')
+        self.assertTrue(obs.configure(self.home))
+        for path in profiles.glob('*/basic.ini'):
+            p = viewers.read_ini(path)
+            for section, key in (('SimpleOutput', 'FilePath'),
+                    ('AdvOut', 'RecFilePath'), ('AdvOut', 'FFFilePath')):
+                self.assertEqual(p[section][key], str(self.home / 'Videos/OBS'))
+            expected = configparser.ConfigParser(interpolation=None)
+            expected.optionxform = str
+            expected.read_string(original)
+            for section, key in (('SimpleOutput', 'FilePath'),
+                    ('AdvOut', 'RecFilePath'), ('AdvOut', 'FFFilePath')):
+                expected[section][key] = str(self.home / 'Videos/OBS')
+            self.assertEqual(dict(p), dict(expected))
+            backups = list(path.parent.glob('basic.ini.backup-*'))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_text(), original)
+        self.assertEqual(user.read_text(), '[Basic]\nProfileDir=Untitled\n')
+        before = {path: path.read_bytes() for path in profiles.glob('*/basic.ini')}
+        self.assertFalse(obs.configure(self.home))
+        for path, content in before.items():
+            self.assertEqual(path.read_bytes(), content)
+            self.assertEqual(len(list(path.parent.glob('basic.ini.backup-*'))), 1)
 
 
 if __name__ == '__main__':

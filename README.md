@@ -231,8 +231,18 @@ for validation and hardware limitations.
 On a fresh OBS install, the installer creates a **Hyprland Recording** profile:
 1920×1080, 30 FPS, Indistinguishable quality using x264, MKV recordings saved to
 `~/Videos/OBS`. Adjust resolution for a different monitor. Existing OBS profiles
-are preserved; a running OBS instance is skipped. Screen/audio sources must be
+also have their Simple, Advanced, and FFmpeg recording paths set to `~/Videos/OBS`,
+with a backup before changes; their other settings are preserved. A running OBS
+instance is skipped. To apply this to an existing install, close OBS and run
+`python3 scripts/setup-obs.py`. Screen/audio sources must be
 selected in OBS because they depend on the current session and hardware.
+
+The installer adds Downloads, Documents, Pictures, Videos, Projects, and Git
+to Dolphin/KDE Places and GTK 3/4 file chooser bookmarks. Existing custom
+shortcuts are kept; changed files are backed up. Run
+`python3 scripts/setup-places.py` to apply this to an existing install.
+File upload/open/save dialogs float at 60% of the monitor width and height,
+centered on the monitor even above split windows, with an 85% size limit.
 
 ## Validation
 

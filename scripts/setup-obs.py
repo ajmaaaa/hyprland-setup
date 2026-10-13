@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed a recording profile on fresh OBS installs; preserve existing profiles."""
+"""Set OBS recording paths and seed a recording profile on fresh installs."""
 import argparse
 import configparser
 import datetime
@@ -13,9 +13,33 @@ def configure(home):
     destination = home / 'Videos/OBS'
     destination.mkdir(parents=True, exist_ok=True)
     profiles = home / '.config/obs-studio/basic/profiles'
-    if any(profiles.glob('*/basic.ini')):
-        print('OBS already has a profile; kept existing recording settings.')
-        return False
+    existing = sorted(profiles.glob('*/basic.ini'))
+    if existing:
+        changed = False
+        for path in existing:
+            settings = configparser.ConfigParser(interpolation=None)
+            settings.optionxform = str
+            settings.read(path)
+            updated = False
+            for section, key in (
+                ('SimpleOutput', 'FilePath'),
+                ('AdvOut', 'RecFilePath'),
+                ('AdvOut', 'FFFilePath'),
+            ):
+                if not settings.has_section(section):
+                    settings.add_section(section)
+                if settings.get(section, key, fallback=None) != str(destination):
+                    settings[section][key] = str(destination)
+                    updated = True
+            if updated:
+                output = io.StringIO()
+                settings.write(output, space_around_delimiters=False)
+                stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+                shutil.copy2(path, path.with_name('basic.ini.backup-' + stamp))
+                path.write_text(output.getvalue())
+                changed = True
+        print(f'OBS: recording paths set to {destination}; other profile settings preserved.')
+        return changed
     profile = profiles / 'Hyprland'
     profile.mkdir(parents=True, exist_ok=True)
     (profile / 'basic.ini').write_text(
@@ -50,6 +74,6 @@ if __name__ == '__main__':
     parser.add_argument('--home', type=Path, default=Path.home())
     args = parser.parse_args()
     if subprocess.run(['pgrep', '-x', 'obs'], stdout=subprocess.DEVNULL).returncode == 0:
-        print('OBS is running; close it and rerun scripts/setup-obs.py to seed a fresh profile.')
+        print('OBS is running; close it and rerun scripts/setup-obs.py to update recording paths.')
     else:
         configure(args.home)
