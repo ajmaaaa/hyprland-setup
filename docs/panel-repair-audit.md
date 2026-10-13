@@ -1,220 +1,227 @@
-# Audit panel — 12 Oktober 2026
+# Panel audit — October 12, 2026
 
-Konfigurasi aktif dibandingkan dengan working tree `~/Git/hyprland-setup`, termasuk
-perubahan lokal yang sudah ada. Backup sebelum perbaikan:
-`~/.local/state/hyprland-repair/20261012-154313/`.
-Lampiran gambar tidak tersedia di sesi audit; pemeriksaan dilakukan dari kode dan
-panel yang dijalankan pada desktop.
+The active configuration was compared with the working tree at
+`~/Git/hyprland-setup`, including existing local changes. The backup made before
+repairs is at `~/.local/state/hyprland-repair/20261012-154313/`.
+Image attachments were unavailable during the audit; checks used the source code
+and panels running on the desktop.
 
-## Temuan dan perubahan
+## Findings and changes
 
-- Hyprland aktif berbeda pada screenshot binding, autostart workspace preview,
-  dan konfigurasi idle. File dari repo dipulihkan; tambahan panel grafis dan
-  outside-click disimpan pada repo serta konfigurasi aktif.
-- ArchTidy menggunakan curses dan pilihan otomatis dari scanner. GUI GTK 3
-  sekarang tidak memilih apa pun otomatis; tombol checkbox, pencarian, rincian
-  path, tinjauan pilihan lintas kategori, simulasi, dan penghapusan tersedia.
-  Scanner menghormati config TOML dan blacklist pengguna. Scan berlangsung pada
-  worker, dimulai dari cache/paket, dan kategori lain dipindai saat dibuka.
-- Ukuran file di Trash tidak berarti ruang sudah kosong. GUI menjelaskan ini.
-  Paket di GUI dihapus dengan `pacman -R` agar dependensi lain tidak ikut dihapus
-  di luar daftar tinjauan. Arsip pacman sistem menggunakan autentikasi dan
-  penghapusan permanen hanya terhadap file arsip yang ditinjau.
-- Undo sebelumnya menebak nama `file.*`, sehingga tidak cocok dengan nama Trash
-  dari GIO. Pemulihan kini memakai `.trashinfo`, path asli, timestamp batch,
-  serta menolak menimpa file tujuan. Simulasi tidak menggantikan batch nyata.
-  Pemulihan saat ini mendukung Trash pengguna; Trash pada volume lain dapat
-  perlu dipulihkan melalui file manager.
-- Hotspot sebelumnya mengubah adaptor utama menjadi AP. Sekarang AP memakai
-  adaptor bebas atau interface `hypr-hotspot`, dan pada radio yang sama mengikuti
-  kanal uplink. Wi-Fi client dan AP tidak lagi dilaporkan sebagai koneksi yang
-  sama. Radio tanpa kombinasi AP + managed akan menolak aktivasi sambil
-  mempertahankan koneksi utama. Interface virtual dipertahankan untuk pemakaian
-  berikutnya, tanpa autoconnect hotspot.
-- `iw list` pada laptop ini menyatakan kombinasi managed + AP dengan satu kanal.
-  Pembuatan interface virtual memerlukan autentikasi melalui pkexec; kemampuan
-  driver/kanal DFS tetap menentukan apakah AP bisa diaktifkan.
-- ADB lokal (`android-tools 37.0.0-5`) melaporkan mDNS tidak didukung; Avahi tidak
-  aktif. Fallback mDNS langsung membaca nama record DNS, SRV, serta alamat A/AAAA,
-  termasuk DNS compression dan record terpisah. QR memiliki session unik
-  `studio-*`; pairing hanya memakai service session tersebut. Koneksi selanjutnya
-  memakai port `_adb-tls-connect._tcp`, bukan IP tanpa port/port legacy 5555.
-  QR memiliki quiet zone empat modul dan ditampilkan tanpa interpolasi blur.
-  Tombol fallback pairing kode sekarang berjalan setelah operasi QR berakhir.
-- Focus-out bukan sinyal klik pada `follow_mouse=1`. Binding mouse non-consuming
-  mengirim permintaan tutup melalui socket hanya ketika cursor berada di luar
-  persegi panel. Klik tetap diteruskan ke aplikasi tujuan. Klik pada dialog
-  autentikasi tidak menutup panel. Worker operasi yang sudah berjalan tetap
-  ditahan oleh GTK Application sampai selesai bila panel ditutup.
+- The active Hyprland configuration differed in screenshot bindings, workspace
+  preview autostart, and idle settings. Repository files were restored; the new
+  graphical panels and outside-click handling were saved in both the repository
+  and the active configuration.
+- ArchTidy previously used curses and automatic scanner selections. The GTK 3
+  GUI now selects nothing automatically and provides checkboxes, search, path
+  details, cross-category selection review, dry runs, and cleanup. The scanner
+  respects the user's TOML configuration and blacklist. Scanning runs on a
+  worker, starting with caches/packages; other categories are scanned when opened.
+- Files in Trash still occupy disk space, which the GUI explains. Packages are
+  removed with `pacman -R` so dependencies outside the reviewed list are retained.
+  System pacman archives require authentication; permanent deletion applies only
+  to the archive files included in the review.
+- Undo previously guessed `file.*` names, which did not match GIO Trash entries.
+  Restore now uses `.trashinfo`, original paths, and the batch timestamp, and
+  refuses to overwrite destination files. A dry run does not replace a real
+  cleanup batch. Restore currently supports the user's Trash; files trashed on
+  other volumes may need to be restored through a file manager.
+- Hotspot previously converted the primary adapter into an AP. It now uses a
+  free adapter or the `hypr-hotspot` interface, following the uplink channel when
+  sharing one radio. Wi-Fi client and AP connections are reported separately.
+  Radios without AP + managed support reject activation while preserving the
+  primary connection. The virtual interface is retained for later use without
+  enabling hotspot autoconnect.
+- `iw list` on this laptop reports managed + AP support on one channel. Creating
+  a virtual interface requires authentication through pkexec; driver support and
+  DFS channel restrictions still determine whether the AP can start.
+- Local ADB (`android-tools 37.0.0-5`) reports that mDNS is unsupported, and Avahi
+  is inactive. The direct mDNS fallback reads DNS record names, SRV records, and
+  A/AAAA addresses, including DNS compression and records spread across packets.
+  Each QR session has a unique `studio-*` name; pairing uses only that session's
+  service. Connection then uses the `_adb-tls-connect._tcp` port rather than an
+  IP without a port or legacy port 5555. The QR code has a four-module quiet zone
+  and is displayed without blur interpolation. Code-pairing fallback controls
+  now work after the QR operation ends.
+- Focus-out is not an outside-click signal with `follow_mouse=1`. Non-consuming
+  mouse bindings send a close request over a socket only when the cursor is
+  outside the panel rectangle. Clicks still reach their destination application.
+  Clicking an authentication dialog does not close the panel. GTK Application
+  retains workers for running operations until they finish if the panel closes.
 
-## Validasi
+## Validation
 
-- Unit tests repository dan ArchTidy lulus, termasuk pencocokan session QR,
-  port koneksi, DNS compression, hotspot pada kanal uplink, proteksi koneksi
-  utama, pemulihan Trash, dan penghapusan paket yang hanya ditinjau.
-- GUI smoke pada desktop: checkbox, pencarian, tinjauan, pilihan awal kosong,
-  klik di dalam tetap terbuka, klik di luar menutup, dan socket dibersihkan.
-  Panel Connections juga diuji peluncuran dan outside-click.
-- Socket mDNS multicast berhasil dijalankan pada laptop; tidak ada service ADB
-  yang ditemukan saat audit. Hyprland reload berhasil tanpa config errors.
-- Tidak ada file pengguna atau paket yang dibersihkan pada sesi ini. Pengujian
-  GUI memakai kandidat contoh; eksekusi paket hanya diuji dengan mock.
-- Aktivasi hotspot sesungguhnya dan pairing ponsel belum diuji ujung ke ujung,
-  karena memerlukan autentikasi sistem dan ponsel yang melakukan scan. Router
-  harus mengizinkan multicast mDNS serta komunikasi antar perangkat.
+- Repository and ArchTidy unit tests passed, including QR session matching,
+  connection ports, DNS compression, hotspot uplink channels, primary-connection
+  protection, Trash restore, and removal of only the reviewed packages.
+- Desktop GUI smoke checks covered checkboxes, search, selection review, empty
+  initial selections, keeping the panel open on inside clicks, closing it on
+  outside clicks, and socket cleanup. Connections panel launch and outside-click
+  handling were also tested.
+- The multicast mDNS socket started successfully on the laptop, but no ADB
+  service was found during the audit. Hyprland reloaded without configuration errors.
+- No user files or packages were cleaned during this session. GUI tests used
+  sample candidates, and package execution was tested only with mocks.
+- Actual hotspot activation and phone pairing were not tested end to end because
+  they require system authentication and a phone scanning the QR code. The router
+  must allow multicast mDNS and communication between devices.
 
-Referensi protokol ADB:
+ADB protocol reference:
 https://android.googlesource.com/platform/packages/modules/adb/+/HEAD/docs/dev/adb_wifi.md
 
-## Tindak lanjut error hotspot
+## Hotspot error follow-up
 
-Pengujian pengguna menunjukkan interface `hypr-hotspot` unavailable. Log kernel
-dan wpa_supplicant mengungkap bahwa NetworkManager menginisialisasi interface
-sebagai managed, menyebabkan pelanggaran batas satu managed interface.
-Perbaikan selanjutnya memakai hostapd pada interface AP unmanaged, DNS/DHCP
-dnsmasq, serta aturan NAT/FORWARD yang hanya diberi tag `hypr-hotspot`. Backend
-ini memerlukan autentikasi saat start/stop dan memasang hostapd pada penggunaan
-pertama jika belum tersedia. Kegagalan start membersihkan service, alamat IP,
-interface, serta aturan firewall milik hotspot. Wi-Fi utama tidak diubah oleh
-helper. IP forwarding global dipertahankan agar tidak mengganggu Docker/VPN.
+User testing showed that `hypr-hotspot` was unavailable. Kernel and
+wpa_supplicant logs revealed that NetworkManager initialized the interface as
+managed, violating the limit of one managed interface. The subsequent fix uses
+hostapd on an unmanaged AP interface, dnsmasq for DNS/DHCP, and NAT/FORWARD rules
+marked only with `hypr-hotspot`. This backend requires authentication on start/stop
+and installs hostapd on first use if it is missing. A failed start cleans up its
+services, IP address, interface, and firewall rules. The helper leaves the primary
+Wi-Fi connection unchanged and preserves global IP forwarding to avoid disrupting
+Docker/VPN networking.
 
-Kanal Wi-Fi utama saat error adalah 64 (5320 MHz), berstatus no IR dan radar
-detection pada driver. AP pada kanal ini ditolak sebelum autentikasi. SSID utama
-yang sama tersedia di kanal 11, 2.4 GHz. Tombol **Gunakan Wi-Fi 2.4 GHz** memilih
-BSSID 2.4 GHz pada SSID yang sama; perpindahan ini menyambungkan ulang Wi-Fi dan
-dapat memutus koneksi sesaat. Setelah itu, tombol **Turn On Hotspot** memulai
-backend AP. Interface lama yang gagal sudah dibuat unmanaged agar wpa_supplicant
-tidak terus mencoba menginisialisasi client kedua.
+The primary Wi-Fi channel at the time of the error was 64 (5320 MHz), marked
+no IR and radar detection by the driver. AP activation on this channel is rejected
+before authentication. The same SSID is available on channel 11 at 2.4 GHz.
+**Use 2.4 GHz Wi-Fi** selects the 2.4 GHz BSSID for the same SSID; switching
+reconnects Wi-Fi and may briefly interrupt the connection. **Turn On Hotspot**
+then starts the AP backend. The old failed interface was made unmanaged so
+wpa_supplicant would stop trying to initialize a second client.
 
-Aktivasi AP hostapd dan koneksi ponsel masih memerlukan pengujian pengguna; tidak
-ada klaim bahwa hotspot berhasil aktif pada kanal 64. Unit test tambahan mencakup
-penolakan kanal terbatas sebelum perubahan sistem, lifecycle AP terisolasi, dan
-pembersihan saat startup gagal.
+hostapd AP activation and phone connectivity still require user testing. No claim
+is made that hotspot activation succeeded on channel 64. Additional unit tests
+cover rejecting restricted channels before system changes, the isolated AP
+lifecycle, and cleanup after startup failure.
 
-## Tindak lanjut QR hotspot tidak tersambung
+## Hotspot QR connection follow-up
 
-Output nmcli `FREQ` mencantumkan unit, misalnya `2462 MHz`. Filter frekuensi
-sebelumnya memakai isdigit sehingga melewatkan jaringan 2.4 GHz yang ada. Filter
-kini menerima angka dengan unit MHz. Wi-Fi yang sudah berada di 2.4 GHz tidak
-disambungkan ulang oleh tombol pemindahan band.
+nmcli `FREQ` output includes units, such as `2462 MHz`. The previous frequency
+filter used isdigit and skipped available 2.4 GHz networks. The filter now accepts
+numbers followed by MHz. The band-switch button does not reconnect Wi-Fi that
+is already using 2.4 GHz.
 
-Saat AP hostapd pertama aktif, kredensial berasal dari profil NetworkManager
-lama, tetapi panel kemudian membaca file preferensi yang berbeda. Ditemukan
-SSID AP `Hyprland-Hotspot`, sedangkan preferensi panel bernama `Arch`. Setelah
-start berhasil, kredensial persis yang dikirim ke AP sekarang disimpan sebagai
-state panel. Profil NM nonaktif tidak lagi menimpa preferensi tersimpan.
+When the hostapd AP first started, its credentials came from an old NetworkManager
+profile, while the panel subsequently read a different preferences file. The
+actual AP SSID was `Hyprland-Hotspot`, but the panel preferences used `Arch`.
+After a successful start, the exact credentials sent to the AP are now saved as
+panel state. Inactive NM profiles no longer overwrite saved preferences.
 
-Untuk sesi lama yang sudah telanjur berbeda, status memeriksa SSID aktual dari
-iw. Password lama tidak ditampilkan dan QR disembunyikan saat mismatch; tombol
-sinkronisasi membaca konfigurasi AP aktif melalui helper dengan autentikasi
-sistem, lalu menyimpan hasilnya pada file pengguna dengan mode 0600. Penyimpanan
-perubahan kredensial AP aktif dilakukan setelah restart berhasil.
+For older sessions with mismatched state, status checks read the actual SSID
+from iw. The old password is not displayed, and the QR code is hidden on a
+mismatch. The synchronization button reads the active AP configuration through
+an authenticated helper and saves the result in a user file with mode 0600.
+Changes to active AP credentials are saved only after a successful restart.
 
-Pada pemeriksaan ini service AP dan DHCP telah aktif pada kanal 6. Belum ada
-station yang terhubung atau pertukaran DHCP dari ponsel dalam log. Karena itu
-koneksi ponsel belum diklaim berhasil, dan ketidakcocokan SSID/kredensial adalah
-temuan terkonfirmasi yang diperbaiki sebelum menguji sambungan lagi.
+During this check, the AP and DHCP services were active on channel 6, but logs
+showed no connected station or DHCP exchange with a phone. Phone connectivity
+was therefore not claimed; the confirmed SSID/credential mismatch was repaired
+before another connection test.
 
-## Tindak lanjut perangkat terus connecting
+## Devices stuck connecting follow-up
 
-Log sesi 19:31 menunjukkan autentikasi WPA berhasil, lalu perangkat terputus
-sekitar 18 detik kemudian tanpa lease DHCP. AP dan dnsmasq aktif, dengan alamat
-gateway 10.42.88.1/24 dan socket DHCP pada interface hotspot. Firewalld aktif;
-interface hotspot tidak memiliki zona eksplisit sehingga masuk zona public
-yang tidak mengizinkan DHCP/DNS. Aturan ACCEPT iptables helper tidak mengatasi
-penolakan dari hook nftables firewalld.
+The 19:31 session log showed successful WPA authentication followed by a
+connection drop about 18 seconds later without a DHCP lease. AP and dnsmasq were
+active, with gateway 10.42.88.1/24 and a DHCP socket on the hotspot interface.
+Firewalld was active; the hotspot interface had no explicit zone and inherited
+the public zone, which did not allow DHCP/DNS. The helper's iptables ACCEPT rules
+did not override rejection from firewalld's nftables hook.
 
-Helper kini menempatkan interface hotspot saja pada zona runtime `nm-shared`,
-zona bawaan untuk berbagi jaringan. Zona sebelumnya disimpan sebelum perubahan
-dan dipulihkan saat stop atau cleanup startup gagal. Zona yang kemudian diubah
-pengguna tidak ditimpa saat cleanup. Firewalld nonaktif tetap memakai jalur
-iptables sebelumnya. Aksi `repair-firewall` menerapkan perubahan pada sesi aktif
-tanpa restart AP atau koneksi Wi-Fi utama. Tidak ada reload firewall global.
+The helper now puts only the hotspot interface in the runtime `nm-shared` zone,
+the built-in zone for network sharing. It saves the previous zone before changes
+and restores it on stop or failed-start cleanup. Cleanup does not overwrite a
+zone subsequently changed by the user. With firewalld inactive, the previous
+iptables path remains in use. `repair-firewall` applies changes to an active
+session without restarting the AP or primary Wi-Fi connection. No global
+firewall reload is performed.
 
-Perbaikan diterapkan pada konfigurasi aktif dan repo; tujuh tes helper dan
-seluruh 49 tes repository lulus pada sesi desktop. Zona runtime terverifikasi
-`nm-shared` dan uplink tetap connected. Pada pengujian ulang pukul 19:39:17,
-dnsmasq mencatat DHCPACK 10.42.88.167 untuk ponsel A13; neighbor interface juga
-menampilkan MAC perangkat itu. Koneksi dan pemberian IP terverifikasi. Akses
-internet di ponsel belum dikonfirmasi; ada satu log upstream DNS menolak query
-rekursif. Tes GTK dalam sandbox sebelumnya crash; pengulangan dengan akses sesi
-desktop lulus. `git diff --check` melaporkan blank line EOF pada file
-windowrules.conf yang sudah berubah sebelum perbaikan ini.
+The fix was applied to the active configuration and repository. Seven helper
+tests and all 49 repository tests passed in the desktop session. The runtime
+zone was confirmed as `nm-shared`, and the uplink remained connected. During the
+19:39:17 retest, dnsmasq logged DHCPACK 10.42.88.167 for an A13 phone; the interface
+neighbor table also showed its MAC address. Connection and IP assignment were
+verified. Internet access on the phone was not confirmed; one upstream DNS log
+rejected a recursive query. Earlier GTK tests in the sandbox crashed, but reruns
+with desktop-session access passed. `git diff --check` reported an EOF blank line
+in windowrules.conf, which had already changed before this repair.
 
-Referensi pengelolaan zona runtime:
+Runtime zone management reference:
 https://firewalld.org/documentation/man-pages/firewall-cmd.html
 
-## Penyederhanaan panel dan pembatalan operasi
+## Panel simplification and operation cancellation
 
-Pengguna mengonfirmasi hotspot berhasil tersambung setelah perbaikan firewall.
-QR hotspot kini hanya dibuat saat AP aktif dan kredensial sesuai. Tombol
-sinkronisasi hanya muncul ketika panel mendeteksi ketidakcocokan SSID aktif;
-tombol 2.4 GHz hanya muncul saat kanal uplink ditolak driver. Kanal yang sudah
-mendukung AP tidak membutuhkan perpindahan band. Sinkronisasi sebelumnya
-merupakan pemulihan sesi lama, bukan langkah wajib menyalakan hotspot.
+The user confirmed successful hotspot connectivity after the firewall fix.
+Hotspot QR codes are now created only when the AP is active and credentials match.
+The synchronization button appears only for an active SSID mismatch; the 2.4 GHz
+button appears only when the driver rejects the uplink channel. Channels that
+already support AP operation do not require a band switch. Synchronization was
+recovery for an older session, not a required step for starting the hotspot.
 
-Header menyediakan Batalkan dan Esc untuk operasi aktif. Klik luar tidak
-menutup panel saat operasi sedang berjalan. Pembatalan menyelesaikan prompt
-internal, menghentikan subprocess pengguna, dan mencegah langkah berikutnya.
-Helper privileged start membaca marker pembatalan, lalu membersihkan AP, DHCP,
-dan aturan hotspot jika startup dibatalkan. Cleanup tidak dibatalkan. Instalasi
-paket yang sudah berjalan dibiarkan selesai agar transaksi pacman tetap utuh.
-Pembatalan tidak memutus koneksi Wi-Fi yang sudah berhasil; aktivasi Wi-Fi yang
-masih pending pada adaptor tujuan dihentikan. Error autentikasi pkexec diberi
-pesan singkat, dan worker selesai mengaktifkan kembali kontrol.
+The header offers Cancel and Esc for active operations. Outside clicks do not
+close the panel during an operation. Cancellation resolves internal prompts,
+stops user subprocesses, and prevents subsequent steps. The privileged start
+helper reads a cancellation marker and cleans up AP, DHCP, and hotspot rules
+if startup is cancelled. Cleanup itself is not cancelled. Package installations
+already running are allowed to finish so pacman transactions remain intact.
+Cancellation does not disconnect Wi-Fi that has already connected successfully;
+pending activation on the target adapter is stopped. pkexec authentication errors
+receive a short message, and workers re-enable controls when they finish.
 
-Daftar Wi-Fi menampilkan ikon kunci untuk jaringan yang memerlukan kredensial.
-OWE tidak ditandai membutuhkan password. Tombol Login membuka browser lewat
-HTTP saat konektivitas perangkat aktif berstatus portal; kebutuhan login tidak
-dapat ditentukan hanya dari hasil scan SSID. Deteksi memakai status per adaptor
-NetworkManager, dan tombol hilang ketika status portal berakhir. Jaringan full,
-limited, dan unknown tidak otomatis dianggap portal.
+The Wi-Fi list shows a lock icon for networks that require credentials. OWE is
+not marked as requiring a password. Login opens a browser over HTTP when the
+active device's connectivity state is portal; the need to log in cannot be
+inferred from SSID scans alone. Detection uses NetworkManager state per adapter,
+and the button disappears when portal state ends. Full, limited, and unknown
+networks are not automatically treated as portals.
 
-Suite repository berisi 59 tes lulus pada desktop; sesudah itu pengujian tambahan
-pemulihan kontrol setelah pembatalan juga lulus dalam 10 tes usability. Pengujian
-meliputi proses nyata yang tidur 30 detik dibatalkan dalam kurang dari 3 detik,
-prompt yang terlepas, QR mati/aktif, ikon kunci dan tombol Login bersamaan,
-kondisi kanal, cleanup helper, serta preservasi koneksi Wi-Fi yang sudah aktif.
-Portal sesungguhnya dan dialog password salah belum diuji pada jaringan nyata.
-Empat script dipasang ke konfigurasi aktif dengan backup. Panel yang sudah
-terbuka memakai perubahan pada peluncuran berikutnya; AP aktif tidak direstart.
+All 59 repository tests passed on the desktop. Ten usability tests, including
+additional checks for restoring controls after cancellation, also passed.
+Checks covered cancelling a real 30-second sleep process in under 3 seconds,
+released prompts, inactive/active QR codes, lock icons and Login appearing
+together, channel conditions, helper cleanup, and preserving connected Wi-Fi.
+A real captive portal and incorrect-password dialog were not tested on a live
+network. Four scripts were installed in the active configuration with backups.
+Already-open panels use the changes on their next launch; the active AP was
+not restarted.
 
-Referensi status portal NetworkManager:
+NetworkManager portal state reference:
 https://networkmanager.dev/docs/api/latest/nmcli.html
 
-## Wireless debugging: halaman terpadu dan pairing terbatas
+## Wireless debugging: unified page and bounded pairing
 
-Halaman ADB sekarang mengikuti layout hotspot: kartu kontrol dan daftar perangkat
-terhubung, tanpa kolom QR kosong. QR baru ditampilkan ketika penemuan perangkat
-siap pada sesi pairing aktif. QR hilang saat paired, connected, timeout, error,
-atau cancelled; ukuran jendela kembali ringkas. Pairing QR tidak lagi menahan
-panel dalam modal Future. Detail perangkat memakai Back/Esc, tanpa Batalkan pada
-header. Tombol Hentikan pairing berada di kartu sesi yang sedang berlangsung.
-Daftar perangkat diperbarui otomatis dan menampilkan nama serta status aktual.
+The ADB page now follows the hotspot layout: a control card and connected-device
+list, with no empty QR column. QR appears only when discovery is ready in an
+active pairing session. It disappears on paired, connected, timeout, error, or
+cancelled states, and the window returns to its compact size. QR pairing no
+longer blocks the panel in a modal Future. Device details use Back/Esc without
+Cancel in the header. Stop pairing is on the active-session card. The device
+list refreshes automatically and displays actual names and states.
 
-ADB laptop menyatakan mDNS tidak didukung; penemuan native tetap diperlukan.
-Firewalld public sebelumnya tidak mengizinkan mDNS. Helper baru mengizinkan
-service mdns saja pada zona Wi-Fi aktif, runtime dan permanent tanpa reload.
-Izin public berhasil diterapkan melalui autentikasi sistem pada sesi ini.
-Pemakaian berikutnya hanya meminta autentikasi jika zona Wi-Fi belum mengizinkan
-mDNS. Native discovery juga mengikuti interface hotspot, dan Avahi hanya dipakai
-ketika daemon benar-benar aktif agar polling tidak tertahan oleh daemon mati.
+The laptop's ADB reports no mDNS support, so native discovery remains necessary.
+Firewalld's public zone previously did not allow mDNS. The new helper allows
+only the mdns service on the active Wi-Fi zone, in both runtime and permanent
+configuration, without a reload. Public-zone permission was applied successfully
+through system authentication during this session. Later use requests
+authentication only if the Wi-Fi zone does not allow mDNS. Native discovery also
+follows the hotspot interface, and Avahi is used only when its daemon is actually
+active so polling does not wait on a stopped daemon.
 
-Session QR memakai nama studio unik serta membedakan waiting, pairing, connecting,
-dan terminal states. Scan dibatasi 90 detik, pairing client 15 detik, pencarian
-port koneksi 20 detik, dan connect client 5 detik. Pairing hanya menuju instance QR
-sesi tersebut; port connect berasal dari service TLS pada host perangkat yang
-dipasangkan. Connected memerlukan transport state device, bukan sekadar sukses
-pairing. Error menutup sesi dan menyembunyikan QR; secret tidak masuk pesan error.
-Pembatalan menjangkau subprocess pairing melalui Operation pada thread sesi.
+QR sessions use a unique studio name and distinguish waiting, pairing, connecting,
+and terminal states. Scanning is limited to 90 seconds, the pairing client to
+15 seconds, connect-port discovery to 20 seconds, and the connect client to
+5 seconds. Pairing targets only that session's QR instance; the connect port comes
+from the TLS service on the paired device's host. Connected requires transport
+state device, not merely successful pairing. Errors close the session and hide
+the QR code without including secrets in error messages. Cancellation reaches
+the pairing subprocess through Operation on the session thread.
 
-Seluruh 65 tes repository lulus, termasuk QR idle/aktif/selesai, daftar nama
-perangkat, detail tanpa Batalkan, timeout, error tanpa secret, pembatalan, serta
-port pairing/connect yang berbeda. Script dipasang dengan backup. Pairing HP
-sesungguhnya masih menunggu pengujian ulang pengguna. Router yang mengisolasi
-client tetap dapat menghalangi komunikasi antar laptop dan HP.
+All 65 repository tests passed, including idle/active/completed QR states, device
+names, details without Cancel, timeout, errors without secrets, cancellation, and
+different pairing/connect ports. Scripts were installed with backups. Actual
+phone pairing still awaits another user test. Routers that isolate clients can
+still block communication between the laptop and phone.
 
-Referensi protokol pairing/penemuan:
+Pairing/discovery protocol reference:
 https://android.googlesource.com/platform/packages/modules/adb/+/HEAD/docs/dev/adb_wifi.md
 
 ## English panels and Junk only filter
