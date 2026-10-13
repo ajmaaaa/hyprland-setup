@@ -113,7 +113,7 @@ class PanelUsabilityTests(unittest.TestCase):
             qr.assert_called_once()
 
     def test_secure_portal_network_shows_both_lock_and_login(self):
-        self.panel.add_row('Campus', 'Login diperlukan', 'network-wireless-symbolic', locked=True, login=True)
+        self.panel.add_row('Campus', 'Login required', 'network-wireless-symbolic', locked=True, login=True)
         widgets = list(self.widgets(self.panel.listbox))
         self.assertTrue(any(isinstance(w, self.ui.Gtk.Image) and w.get_icon_name()[0] == 'changes-prevent-symbolic' for w in widgets))
         login = next(w for w in widgets if isinstance(w, self.ui.Gtk.Button) and w.get_label() == 'Login')

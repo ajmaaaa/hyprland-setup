@@ -1488,8 +1488,7 @@ class AdbQrSession:
                     for _, kind, endpoint in services:
                         if kind != '_adb-tls-connect._tcp' or endpoint.rsplit(':', 1)[0] != paired_host:
                             continue
-                        adb_run('connect', endpoint, timeout=5)
-                        model = verify_adb_ready(endpoint)
+                        model = connect_adb_endpoint(endpoint)
                         self.update('connected', f'{model} connected and responding to ADB. The device appears below.')
                         return
                 if self.operation.cancelled.wait(.5):
@@ -1532,7 +1531,64 @@ def adb_pair():
     output = adb_run('pair', address, data=code + '\n')
     if 'successfully paired' not in output.lower():
         raise RuntimeError('Pairing failed. Check the code and pairing port on the phone.')
-    info('Pairing complete', 'If the device does not appear, use Connect IP:port. The connection port on the main Wireless debugging page can differ from the pairing port.')
+    connected = connect_after_adb_pairing(address)
+    if connected:
+        model, endpoint = connected
+        notify(f'{model} connected and responding to ADB ({endpoint}). You can now open scrcpy.')
+    else:
+        info('Pairing saved, not connected', 'Your phone is paired, but there is no confirmed ADB connection yet. Use Connect IP:port with the address on the main Wireless debugging page before opening scrcpy.')
+
+
+def connect_adb_endpoint(address):
+    """Connect a validated endpoint and confirm that its shell responds."""
+    address = adb_endpoint(address)
+    output = adb_run('connect', address, timeout=5)
+    if 'connected to' not in output.lower():
+        raise RuntimeError(output or 'The device is not connected.')
+    return verify_adb_ready(address)
+
+
+def connect_after_adb_pairing(pairing_address):
+    """Pairing authorizes the laptop; a separate transport is needed for scrcpy."""
+    paired_host, paired_port = pairing_address.rsplit(':', 1)
+    paired_ip = ipaddress.ip_address(paired_host.strip('[]'))
+    services = []
+    discovery_error = ''
+    try:
+        services = adb_mdns_services()
+        if not services:
+            operation = getattr(OPERATION, 'current', None)
+            services = native_adb_mdns({}, operation.cancelled if operation else None)
+    except OperationCancelled:
+        raise
+    except (OSError, RuntimeError) as error:
+        discovery_error = str(error)
+    for _, kind, endpoint in services:
+        if kind != '_adb-tls-connect._tcp':
+            continue
+        host, port = adb_endpoint(endpoint).rsplit(':', 1)
+        if ipaddress.ip_address(host.strip('[]')) != paired_ip or int(port) == int(paired_port):
+            continue
+        check_cancelled()
+        try:
+            return connect_adb_endpoint(endpoint), endpoint
+        except OperationCancelled:
+            raise
+        except RuntimeError as error:
+            discovery_error = str(error)
+    check_cancelled()
+    message = ('Pairing succeeded. Enter IP:port from the main Wireless debugging page on your phone. '
+               'Use the connection port, not the port from the pairing-code dialog.')
+    if discovery_error:
+        message += '\nAutomatic connection was not ready: ' + discovery_error[-400:]
+    address = entry('Connect paired Android', message)
+    if address is None:
+        return None
+    address = adb_endpoint(address)
+    host, port = address.rsplit(':', 1)
+    if ipaddress.ip_address(host.strip('[]')) == paired_ip and int(port) == int(paired_port):
+        raise RuntimeError('That is the pairing port. Use IP:port from the main Wireless debugging page to connect before opening scrcpy.')
+    return connect_adb_endpoint(address), address
 
 
 def adb_connect():
@@ -1540,10 +1596,7 @@ def adb_connect():
     if address is None:
         return
     address = adb_endpoint(address)
-    output = adb_run('connect', address)
-    if 'connected to' not in output.lower():
-        raise RuntimeError(output or 'The device is not connected.')
-    model = verify_adb_ready(address)
+    model = connect_adb_endpoint(address)
     notify(f'{model} connected and responding to ADB.')
 
 

@@ -17,6 +17,63 @@ def dns(name):
 
 
 class RepairsTest(unittest.TestCase):
+    def test_code_pairing_connects_only_the_paired_host_on_its_connection_port(self):
+        services = [
+            ('other-phone', '_adb-tls-connect._tcp', '192.168.1.8:41234'),
+            ('paired-phone', '_adb-tls-pairing._tcp', '192.168.1.7:37123'),
+            ('paired-phone', '_adb-tls-connect._tcp', '192.168.1.7:41234'),
+        ]
+        def adb(*args, **kw):
+            return 'Successfully paired to device' if args[0] == 'pair' else 'connected to 192.168.1.7:41234'
+        with patch.object(c, 'entry', side_effect=['192.168.1.7:37123', '123456']) as entry, \
+             patch.object(c, 'adb_mdns_services', return_value=services), \
+             patch.object(c, 'adb_run', side_effect=adb) as run, \
+             patch.object(c, 'verify_adb_ready', return_value='Phone') as ready, \
+             patch.object(c, 'notify') as notify:
+            c.adb_pair()
+        self.assertEqual(entry.call_count, 2)
+        self.assertEqual(run.call_args.args, ('connect', '192.168.1.7:41234'))
+        ready.assert_called_once_with('192.168.1.7:41234')
+        self.assertIn('You can now open scrcpy', notify.call_args.args[0])
+
+    def test_code_pairing_falls_back_to_prompt_when_discovery_finds_no_phone(self):
+        with patch.object(c, 'adb_mdns_services', return_value=[]), \
+             patch.object(c, 'native_adb_mdns', return_value=[]), \
+             patch.object(c, 'entry', return_value='192.168.1.7:41234') as entry, \
+             patch.object(c, 'adb_run', return_value='already connected to 192.168.1.7:41234'), \
+             patch.object(c, 'verify_adb_ready', return_value='Phone'):
+            self.assertEqual(c.connect_after_adb_pairing('192.168.1.7:37123'), ('Phone', '192.168.1.7:41234'))
+        self.assertIn('main Wireless debugging page', entry.call_args.args[1])
+
+    def test_pairing_port_is_rejected_before_trying_to_connect(self):
+        with patch.object(c, 'adb_mdns_services', return_value=[]), \
+             patch.object(c, 'native_adb_mdns', return_value=[]), \
+             patch.object(c, 'entry', return_value='192.168.1.7:37123'), \
+             patch.object(c, 'adb_run') as adb:
+            with self.assertRaisesRegex(RuntimeError, 'pairing port'):
+                c.connect_after_adb_pairing('192.168.1.7:37123')
+            adb.assert_not_called()
+
+    def test_unusable_transport_after_pairing_never_claims_scrcpy_is_ready(self):
+        services = [('phone', '_adb-tls-connect._tcp', '192.168.1.7:41234')]
+        def adb(*args, **kw):
+            return 'Successfully paired to device' if args[0] == 'pair' else 'connected to 192.168.1.7:41234'
+        with patch.object(c, 'entry', side_effect=['192.168.1.7:37123', '123456', None]), \
+             patch.object(c, 'adb_mdns_services', return_value=services), \
+             patch.object(c, 'adb_run', side_effect=adb), \
+             patch.object(c, 'verify_adb_ready', side_effect=RuntimeError('offline')), \
+             patch.object(c, 'notify') as notify, patch.object(c, 'info') as info:
+            c.adb_pair()
+        notify.assert_not_called()
+        self.assertEqual(info.call_args.args[0], 'Pairing saved, not connected')
+
+    def test_cancelled_discovery_does_not_open_the_manual_connection_prompt(self):
+        with patch.object(c, 'adb_mdns_services', side_effect=c.OperationCancelled()), \
+             patch.object(c, 'entry') as entry:
+            with self.assertRaises(c.OperationCancelled):
+                c.connect_after_adb_pairing('192.168.1.7:37123')
+            entry.assert_not_called()
+
     def test_device_state_alone_is_not_enough_without_a_working_shell(self):
         with patch.object(c, 'adb_run', side_effect=['device', RuntimeError('device offline')]):
             with self.assertRaisesRegex(RuntimeError, 'offline'):

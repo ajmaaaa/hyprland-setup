@@ -214,7 +214,12 @@ operation is running, and details use Back/Esc.
   QR appears only during an active, ready pairing attempt. Pairing, connection,
   timeout, and error are separate states. Scan from Developer options → Wireless
   debugging → Pair device with QR code on the same network. Code pairing and
-  direct IP:port are also available. Arch builds without ADB mDNS use native
+  direct IP:port are also available. Code pairing now attempts a verified ADB
+  connection to the paired phone. If discovery fails, it asks for the connection
+  IP:port on the main Wireless debugging page; the pairing-dialog port is rejected.
+  Cancelling that step preserves pairing but reports that the device is not yet
+  connected. scrcpy requires a connected device with a responding ADB shell.
+  Arch builds without ADB mDNS use native
   discovery. Already configured discovery does not request a password; a new
   firewall zone can require a one-time setup authorization. Connection success
   requires an ADB shell response. The panel checks again before opening scrcpy

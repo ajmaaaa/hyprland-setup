@@ -194,10 +194,12 @@ class ConnectionsTest(unittest.TestCase):
     def test_adb_pairing_code_goes_through_stdin(self):
         with patch.object(popup, 'entry', side_effect=['192.168.1.10:37123', '123456']), \
              patch.object(popup, 'adb_run', return_value='Successfully paired to device') as adb, \
+             patch.object(popup, 'connect_after_adb_pairing', return_value=None) as connect, \
              patch.object(popup, 'info'):
             popup.adb_pair()
             self.assertNotIn('123456', adb.call_args.args)
             self.assertEqual(adb.call_args.kwargs['data'], '123456\n')
+            connect.assert_called_once_with('192.168.1.10:37123')
 
     def test_adb_cancel_pairing_has_no_side_effects(self):
         with patch.object(popup, 'entry', side_effect=['192.168.1.10:37123', None]), \
