@@ -37,6 +37,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/scripts/installer-ui.sh"
+source "$SCRIPT_DIR/scripts/installer-packages.sh"
 installer_ui_start
 trap installer_ui_restore EXIT
 
@@ -57,9 +58,15 @@ done
 # =============================================================================
 
 installer_stage "Network checks"
-for prerequisite in sudo pacman curl git; do
+for prerequisite in sudo pacman curl git flock timeout; do
   command -v "$prerequisite" >/dev/null || error "Missing prerequisite: $prerequisite. Install it before running setup."
 done
+installer_acquire_lock || error "Setup is already running in another terminal."
+installer_abort_if_database_blocked() {
+  if [[ "${INSTALLER_DATABASE_BLOCKED:-false}" == true ]]; then
+    error "The package database is still locked. Setup stopped; finish other package managers before rerunning it."
+  fi
+}
 info "Checking internet connection..."
 
 MAX_RETRY=5
@@ -89,7 +96,7 @@ success "Internet connection is stable."
 ensure_dialog() {
   if ! command -v dialog &>/dev/null; then
     info "Installing 'dialog' for interactive package selection..."
-    sudo pacman -S --noconfirm dialog
+    installer_pacman -S --noconfirm dialog
   fi
 }
 
@@ -146,7 +153,7 @@ success "Pacman configured."
 
 installer_stage "System update"
 info "Updating system packages..."
-sudo pacman -Syu --noconfirm
+installer_pacman -Syu --noconfirm archlinux-keyring
 
 # =============================================================================
 # INSTALL PACMAN PACKAGES
@@ -163,13 +170,16 @@ if [[ ${#FINAL_PACMAN_PACKAGES[@]} -gt 0 ]]; then
     needed_flag=""
   fi
   # Attempt to install all pacman packages in one command (batch)
-  if ! sudo pacman -S $needed_flag --noconfirm "${FINAL_PACMAN_PACKAGES[@]}"; then
+  if ! installer_pacman -S $needed_flag --noconfirm "${FINAL_PACMAN_PACKAGES[@]}"; then
+    installer_abort_if_database_blocked
     warn "Batch pacman installation failed. Retrying packages individually..."
     for pkg in "${FINAL_PACMAN_PACKAGES[@]}"; do
-      if ! sudo pacman -S $needed_flag --noconfirm "$pkg"; then
+      if ! installer_pacman -S $needed_flag --noconfirm "$pkg"; then
+        installer_abort_if_database_blocked
         warn "Failed to install '$pkg' — retrying once..."
         sleep 3
-        if ! sudo pacman -S $needed_flag --noconfirm "$pkg"; then
+        if ! installer_pacman -S $needed_flag --noconfirm "$pkg"; then
+          installer_abort_if_database_blocked
           warn "Skipping '$pkg' after retry failure."
           PACMAN_FAILED+=("$pkg")
         fi
@@ -190,7 +200,7 @@ success "Pacman packages installed."
 installer_stage "Set up the AUR helper"
 if ! command -v yay &>/dev/null; then
   info "Installing yay AUR helper..."
-  sudo pacman -S --needed --noconfirm base-devel git
+  installer_pacman -S --needed --noconfirm base-devel git
   # Add curl retry flag to makepkg config
   if ! grep -qF -- "--retry 5" /etc/makepkg.conf; then
     sudo sed -i '/curl/s/-o %o %u/--retry 5 --retry-delay 5 -o %o %u/' /etc/makepkg.conf
@@ -214,7 +224,11 @@ if ! command -v yay &>/dev/null; then
   fi
 
   cd "$YAY_BUILD_DIR/yay"
-  makepkg -si --noconfirm
+  yay_build_log=$(mktemp)
+  installer_package_command "$yay_build_log" makepkg --syncdeps --noconfirm
+  rm -f "$yay_build_log"
+  mapfile -t YAY_BUILT_PACKAGES < <(makepkg --packagelist)
+  installer_pacman -U --noconfirm "${YAY_BUILT_PACKAGES[@]}"
   cd "$SCRIPT_DIR"
   rm -rf "$YAY_BUILD_DIR"
   success "yay installed successfully."
@@ -226,58 +240,8 @@ fi
 # INSTALL AUR PACKAGES (WITH PGP ERROR HANDLING + RETRY)
 # =============================================================================
 
-# Configure GPG keyserver for reliable AUR builds
-info "Configuring GPG keyserver..."
-mkdir -p ~/.gnupg
-chmod 700 ~/.gnupg
-if ! grep -q 'keyserver hkps://keyserver.ubuntu.com' ~/.gnupg/gpg.conf 2>/dev/null; then
-  echo 'keyserver hkps://keyserver.ubuntu.com' >> ~/.gnupg/gpg.conf
-fi
-gpgconf --kill dirmngr 2>/dev/null || true
-success "GPG keyserver configured."
-
-# Attempt to import a missing PGP key extracted from build error output
-import_missing_pgp_key() {
-  local output="$1"
-  local key_id
-
-  # Try to extract key ID from various GPG/makepkg error formats
-  key_id=$(echo "$output" | grep -oP '(?<=key |NO_PUBKEY |unknown public key |KEYEXPIRED |KEYREVOKED |signature from ")[0-9A-Fa-f]{8,}' | tail -n1)
-
-  # Fallback: scan lines mentioning key/gpg/pgp/signature for any 16+ char hex string
-  if [[ -z "$key_id" ]]; then
-    key_id=$(echo "$output" | grep -iE 'key|gpg|pgp|signature' | grep -oP '[0-9A-Fa-f]{16,}' | tail -n1)
-  fi
-
-  if [[ -z "$key_id" ]]; then
-    warn "Could not extract PGP key ID from error output. Manual fix may be needed."
-    warn "Relevant output: $(echo "$output" | grep -iE 'key|gpg|pgp|signature' | head -5)"
-    return 1
-  fi
-
-  warn "PGP key not found: $key_id — attempting import via --recv-keys..."
-  gpgconf --kill dirmngr 2>/dev/null || true
-
-  local KEYSERVERS=(
-    "hkps://keyserver.ubuntu.com"
-    "hkps://keys.openpgp.org"
-    "hkps://pgp.mit.edu"
-    "hkp://keyserver.ubuntu.com:80"
-  )
-
-  for ks in "${KEYSERVERS[@]}"; do
-    info "Trying keyserver: $ks"
-    if gpg --keyserver "$ks" --recv-keys "$key_id"; then
-      success "PGP key $key_id imported from $ks."
-      return 0
-    fi
-    warn "Failed from $ks, trying next..."
-  done
-
-  warn "All keyservers failed for key $key_id."
-  warn "You can try manually: gpg --recv-keys $key_id"
-  return 1
-}
+# Missing source-signing keys are handled by installer-packages.sh.
+# Keep the user's GPG configuration and source verification intact.
 
 # --- PROMPT USER FOR AUR PACKAGES ---
 installer_stage "Choose AUR packages"
@@ -329,7 +293,7 @@ fi
 AUR_MAX_RETRY=3
 
 if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
-  sudo pacman -S --needed --noconfirm base-devel
+  installer_pacman -S --needed --noconfirm base-devel
   set +e
   AUR_FAILED=()
   aur_needed_flag="--needed"
@@ -338,7 +302,9 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
   fi
   # Attempt to install all AUR packages in one command (batch)
   info "Running batch installation via yay..."
-  if ! yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch "${FINAL_AUR_PACKAGES[@]}"; then
+  aur_batch_log=$(mktemp)
+  if ! installer_package_command "$aur_batch_log" yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch --sudoloop "${FINAL_AUR_PACKAGES[@]}"; then
+    installer_abort_if_database_blocked
     warn "Batch AUR installation failed. Retrying packages individually..."
     for pkg in "${FINAL_AUR_PACKAGES[@]}"; do
       echo -e "${BLUE}[AUR]${RESET} Installing: ${YELLOW}$pkg${RESET}..."
@@ -346,8 +312,9 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
 
       for attempt in $(seq 1 $AUR_MAX_RETRY); do
         aur_attempt_log=$(mktemp)
-        installer_run_logged "$aur_attempt_log" yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch "$pkg"
+        installer_package_command "$aur_attempt_log" yay -S --noconfirm $aur_needed_flag --answerdiff None --answerclean None --pgpfetch --sudoloop "$pkg"
         install_status=$?
+        installer_abort_if_database_blocked
         install_output=$(cat "$aur_attempt_log")
         rm -f "$aur_attempt_log"
 
@@ -360,9 +327,8 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
         warn "Attempt $attempt/$AUR_MAX_RETRY failed for $pkg."
 
         # Handle PGP/GPG key issues before retrying
-        if echo "$install_output" | grep -qiE "pgp|gpg|signature|key|FAILED"; then
-          warn "PGP issue detected — attempting key import..."
-          import_missing_pgp_key "$install_output"
+        if printf '%s\n' "$install_output" | grep -qiE 'unknown public key|NO_PUBKEY|PGP signatures|BAD signature|BADSIG|KEYREVOKED|KEYEXPIRED|revoked|expired'; then
+          import_missing_pgp_key "$install_output" "$pkg" || break
         fi
 
         if [[ $attempt -lt $AUR_MAX_RETRY ]]; then
@@ -372,13 +338,14 @@ if [[ ${#FINAL_AUR_PACKAGES[@]} -gt 0 ]]; then
       done
 
       if [[ "$PKG_INSTALLED" == false ]]; then
-        warn "Skipping $pkg after $AUR_MAX_RETRY failed attempts."
+        warn "Skipping $pkg after $attempt failed attempt(s). Review its error above."
         AUR_FAILED+=("$pkg")
       fi
     done
   else
     success "Batch AUR package installation completed successfully."
   fi
+  rm -f "$aur_batch_log"
   set +e # Disable exit-on-error for remaining non-critical setup steps to ensure config copying runs
 
   if [[ ${#AUR_FAILED[@]} -gt 0 ]]; then
@@ -674,7 +641,7 @@ if [[ -d "$SDDM_SOURCE" ]]; then
   # Ensure qt6-virtualkeyboard is installed — required by the celestial theme
   if ! pacman -Qi qt6-virtualkeyboard &>/dev/null; then
     info "Installing qt6-virtualkeyboard (required for celestial theme)..."
-    sudo pacman -S --noconfirm --needed qt6-virtualkeyboard
+    installer_pacman -S --noconfirm --needed qt6-virtualkeyboard
   fi
 
   if [[ -f "$SDDM_TARGET/install.sh" ]]; then

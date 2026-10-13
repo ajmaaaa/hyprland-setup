@@ -38,7 +38,15 @@ On a TTY or another desktop it uses the available terminal size. Package
 checklists fill the terminal; retry output remains visible and records the
 actual command exit status. Cancelling a checklist selects no packages.
 
-The installer needs `sudo`, `pacman`, `curl`, and `git`. Network checks do not
+Only one installer can run per user. Package transactions wait up to five minutes
+for pacman's database lock and retry if another transaction acquires it; the
+installer never deletes that lock. Long AUR builds use yay's sudo keepalive.
+Missing AUR signing keys are fetched using full fingerprints declared in the
+package's `.SRCINFO`, followed by another build with signature verification.
+Invalid/revoked/expired signatures remain failures and appear in the failed-package
+summary. Existing GPG configuration is preserved.
+
+The installer needs `sudo`, `pacman`, `curl`, `git`, `flock`, and `timeout`. Network checks do not
 rewrite or lock your DNS configuration. Existing Zsh/Powerlevel10k and Neovim
 configuration is backed up when replaced. Snapper setup runs only on Btrfs and
 preserves an existing root configuration.
