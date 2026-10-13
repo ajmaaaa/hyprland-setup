@@ -211,6 +211,11 @@ operation is running, and details use Back/Esc.
   **Use 2.4 GHz Wi-Fi** appears only when the current channel is restricted;
   **Sync hotspot password** appears only when old session credentials mismatch.
 - Wireless debugging: A unified pairing card and live connected-device list.
+  Scan the panel QR from **Pair device with QR code** on the phone to pair,
+  connect, and open scrcpy automatically. Click a connected-device row to open
+  its screen directly; its only side action is **Disconnect**, which keeps pairing.
+  There is no device details or rename page. Manual pairing/connection controls
+  appear only when QR discovery fails or the connection needs recovery.
   QR appears only during an active, ready pairing attempt. Pairing, connection,
   timeout, and error are separate states. Scan from Developer options → Wireless
   debugging → Pair device with QR code on the same network. Code pairing and

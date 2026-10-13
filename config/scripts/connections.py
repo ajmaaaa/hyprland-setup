@@ -1179,15 +1179,47 @@ def verify_adb_ready(serial):
     return model
 
 
+def existing_scrcpy(serial):
+    """Find a running mirror for this serial without starting another server."""
+    if not shutil.which('pgrep'):
+        return None
+    result = run(['pgrep', '-x', 'scrcpy'], timeout=2)
+    for value in result.stdout.splitlines():
+        if not value.isdigit():
+            continue
+        try:
+            path = Path('/proc') / value / 'cmdline'
+            if path.stat().st_uid != os.getuid():
+                continue
+            args = path.read_bytes().decode(errors='replace').split('\0')
+        except OSError:
+            continue
+        if any(arg == '--serial=' + serial or
+               (arg in ('-s', '--serial') and index + 1 < len(args) and args[index + 1] == serial)
+               for index, arg in enumerate(args)):
+            return int(value)
+    return None
+
+
 def start_scrcpy(serial):
     verify_adb_ready(serial)
     if not shutil.which('scrcpy'):
         raise RuntimeError('scrcpy is not installed.')
+    pid = existing_scrcpy(serial)
+    if pid:
+        if shutil.which('hyprctl'):
+            run(['hyprctl', 'dispatch', f'hl.dsp.focus({{ window = "pid:{pid}" }})'], timeout=2)
+        notify('Screen mirroring is already running.')
+        return
     STATE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     log_path = STATE_DIR / 'scrcpy-last.log'
     with log_path.open('w') as log:
         log_path.chmod(0o600)
-        process = subprocess.Popen(['scrcpy', '-s', serial], stdout=log, stderr=subprocess.STDOUT, env=ENV)
+        args = ['scrcpy', '-s', serial]
+        if shutil.which('stdbuf'):
+            args = ['stdbuf', '-oL', '-eL', *args]
+        process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=log,
+                                   stderr=subprocess.STDOUT, env=ENV, start_new_session=True)
     try:
         code = process.wait(timeout=1.5)
     except subprocess.TimeoutExpired:
@@ -1292,6 +1324,9 @@ def native_adb_mdns(cache, stop_event=None):
             except socket.timeout:
                 continue
             for name, kind, value, ttl in parse_mdns_records(packet):
+                # Keep IPv6 separately so an AAAA record cannot overwrite IPv4.
+                if kind == 'addr' and ':' in value:
+                    kind = 'addr6'
                 key = (name, kind)
                 if ttl:
                     cache[key] = (value, time.monotonic() + ttl)
@@ -1321,8 +1356,9 @@ def native_adb_mdns(cache, stop_event=None):
         for (name, record_kind), ((target, port), _) in [(k, v) for k, v in cache.items() if k[1] == 'srv']:
             for kind in kinds:
                 suffix = '.' + kind + '.local'
-                if name.endswith(suffix) and (target, 'addr') in cache:
-                    ip = cache[(target, 'addr')][0]
+                address = cache.get((target, 'addr')) or cache.get((target, 'addr6'))
+                if name.endswith(suffix) and address:
+                    ip = address[0]
                     host = f'[{ip}]' if ':' in ip else ip
                     services.append((name[:-len(suffix)], kind, adb_endpoint(f'{host}:{port}')))
         return services
@@ -1429,6 +1465,7 @@ class AdbQrSession:
         self.svg = qr_to_svg(f'WIFI:T:ADB;S:{self.service_name};P:{self.code};;')
         self.operation = Operation()
         self.state = 'idle'
+        self.serial = None
         self.message = ''
         self.lock = threading.Lock()
         self.thread = None
@@ -1437,11 +1474,14 @@ class AdbQrSession:
         with self.lock:
             return {'state': self.state, 'message': self.message,
                     'active': self.state in self.ACTIVE,
+                    'serial': self.serial,
                     'svg': self.svg if self.state in ('waiting', 'pairing') else None}
 
-    def update(self, state, message):
+    def update(self, state, message, serial=None):
         with self.lock:
             self.state, self.message = state, message
+            if serial is not None:
+                self.serial = serial
         if self.on_change:
             self.on_change()
 
@@ -1488,8 +1528,14 @@ class AdbQrSession:
                     for _, kind, endpoint in services:
                         if kind != '_adb-tls-connect._tcp' or endpoint.rsplit(':', 1)[0] != paired_host:
                             continue
-                        model = connect_adb_endpoint(endpoint)
-                        self.update('connected', f'{model} connected and responding to ADB. The device appears below.')
+                        try:
+                            model = connect_adb_endpoint(endpoint)
+                        except OperationCancelled:
+                            raise
+                        except RuntimeError:
+                            # The connection service may appear before its transport is ready.
+                            continue
+                        self.update('connected', f'{model} connected and responding to ADB. Opening its screen…', serial=endpoint)
                         return
                 if self.operation.cancelled.wait(.5):
                     raise OperationCancelled()
@@ -1598,6 +1644,11 @@ def adb_connect():
     address = adb_endpoint(address)
     model = connect_adb_endpoint(address)
     notify(f'{model} connected and responding to ADB.')
+
+
+def disconnect_adb_device(serial):
+    adb_run('disconnect', serial, timeout=5)
+    notify('Device disconnected. Pairing is saved for your next connection.')
 
 
 def adb_device_action(device):

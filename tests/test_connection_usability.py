@@ -130,17 +130,53 @@ class PanelUsabilityTests(unittest.TestCase):
         self.panel.render_adb_page([])
         self.assertEqual(len(self.panel.adb_box.get_children()), 2)
         self.assertFalse(self.panel.cancel_action_button.get_visible())
-        session.update(active=False, state='connected', svg=None, message='Terhubung')
+        session.update(active=False, state='connected', svg=None, message='Connected')
         self.panel.render_adb_page([('192.168.1.7:41234', 'Samsung A13', 'device', True)])
         self.assertEqual(len(self.panel.adb_box.get_children()), 1)
         labels = [w.get_text() for w in self.widgets(self.panel.adb_box) if isinstance(w, self.ui.Gtk.Label)]
         self.assertIn('Samsung A13', labels)
 
+    def test_device_row_opens_scrcpy_directly_and_has_only_disconnect(self):
+        serial = '192.168.1.7:41234'
+        self.panel.render_adb_page([(serial, 'Samsung A13', 'device', True)])
+        widgets = list(self.widgets(self.panel.adb_box))
+        listing = next(w for w in widgets if isinstance(w, self.ui.Gtk.ListBox))
+        row = listing.get_children()[0]
+        buttons = [w for w in widgets if isinstance(w, self.ui.Gtk.Button)]
+        self.assertNotIn('Rename device', [w.get_label() for w in buttons])
+        self.assertNotIn('Pair with code', [w.get_label() for w in buttons])
+        with patch.object(self.panel, 'perform', side_effect=lambda callback: callback()), \
+             patch.object(self.ui.backend, 'start_scrcpy') as mirror, \
+             patch.object(self.ui.backend, 'disconnect_adb_device') as disconnect:
+            self.panel.activate_row(listing, row)
+            mirror.assert_called_once_with(serial)
+            next(w for w in buttons if w.get_label() == 'Disconnect').clicked()
+            disconnect.assert_called_once_with(serial)
+
+    def test_qr_completion_opens_the_selected_screen_only_once(self):
+        from types import SimpleNamespace
+        serial = '192.168.1.7:41234'
+        self.panel.page = 'adb'
+        self.panel.adb_session = SimpleNamespace(snapshot=lambda: {'state': 'connected', 'serial': serial}, stop=lambda: None)
+        with patch.object(self.panel, 'refresh'), \
+             patch.object(self.panel, 'perform', side_effect=lambda callback: callback()), \
+             patch.object(self.ui.backend, 'start_scrcpy') as mirror:
+            self.panel.adb_pairing_changed()
+            self.panel.adb_pairing_changed()
+        mirror.assert_called_once_with(serial)
+
+    def test_offline_phone_cannot_start_scrcpy_but_can_be_disconnected(self):
+        self.panel.render_adb_page([('192.168.1.7:41234', 'Samsung A13', 'offline', True)])
+        widgets = list(self.widgets(self.panel.adb_box))
+        listing = next(w for w in widgets if isinstance(w, self.ui.Gtk.ListBox))
+        self.assertIsNone(listing.get_children()[0].callback)
+        self.assertTrue(any(isinstance(w, self.ui.Gtk.Button) and w.get_label() == 'Disconnect' for w in widgets))
+
     def test_device_details_do_not_show_header_cancel(self):
         self.panel.busy = True
         self.panel.cancel_action_button.show()
         future = Future()
-        self.panel.show_prompt(future, 'Samsung A13', 'Terhubung', ['Rename device', 'Disconnect', 'Back'])
+        self.panel.show_prompt(future, 'Samsung A13', 'Connected', ['Rename device', 'Disconnect', 'Back'])
         self.assertFalse(self.panel.cancel_action_button.get_visible())
 
     def test_connected_message_is_removed_when_the_device_disappears(self):

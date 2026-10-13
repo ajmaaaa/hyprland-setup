@@ -124,6 +124,7 @@ class Panel(Gtk.ApplicationWindow):
         self.busy = False
         self.operation = None
         self.adb_session = None
+        self.adb_screen_started = None
         self.adb_devices_snapshot = []
         self.discovery = None
         self.discovery_lock = threading.Lock()
@@ -508,7 +509,7 @@ class Panel(Gtk.ApplicationWindow):
         row.add(box)
         self.home_list.add(row)
 
-    def add_row(self, title, subtitle, icon, callback=None, badge='', target=None, detail=None, edit_callback=None, locked=False, login=False, container=None):
+    def add_row(self, title, subtitle, icon, callback=None, badge='', target=None, detail=None, disconnect_callback=None, locked=False, login=False, container=None):
         row = Gtk.ListBoxRow(activatable=callback is not None or target is not None)
         row.target = target
         row.callback = callback
@@ -559,15 +560,11 @@ class Panel(Gtk.ApplicationWindow):
         if badge and not detail:
             side.pack_start(label(badge, 'badge-active'), False, False, 0)
 
-        if edit_callback:
-            edit_btn = Gtk.Button()
-            edit_btn.get_style_context().add_class('icon-btn')
-            edit_btn.set_tooltip_text('Rename device')
-            edit_img = Gtk.Image.new_from_icon_name('document-edit-symbolic', Gtk.IconSize.BUTTON)
-            edit_img.set_pixel_size(16)
-            edit_btn.add(edit_img)
-            edit_btn.connect('clicked', lambda *_: self.perform(edit_callback))
-            side.pack_start(edit_btn, False, False, 0)
+        if disconnect_callback:
+            disconnect = Gtk.Button(label='Disconnect')
+            disconnect.set_tooltip_text('Disconnect this device; keep its pairing')
+            disconnect.connect('clicked', lambda *_: self.perform(disconnect_callback))
+            side.pack_start(disconnect, False, False, 0)
 
         if detail:
             arrow = Gtk.Button(label='›')
@@ -668,6 +665,7 @@ class Panel(Gtk.ApplicationWindow):
         if self.busy or (self.adb_session and self.adb_session.snapshot()['active']):
             return
         try:
+            self.adb_screen_started = None
             self.adb_session = backend.AdbQrSession(on_change=lambda: GLib.idle_add(self.adb_pairing_changed))
             self.adb_session.start()
             self.render_adb_page(self.adb_devices_snapshot)
@@ -679,13 +677,18 @@ class Panel(Gtk.ApplicationWindow):
             if self.adb_session.snapshot()['state'] == 'connected':
                 self.snapshot = None
                 self.refresh()
+                serial = self.adb_session.snapshot().get('serial')
+                if serial and self.adb_screen_started != serial:
+                    self.adb_screen_started = serial
+                    self.perform(lambda serial=serial: backend.start_scrcpy(serial))
             else:
                 self.render_adb_page(self.adb_devices_snapshot)
         return False
 
     def render_adb_page(self, devices):
         session = self.adb_session.snapshot() if self.adb_session else {'active': False, 'svg': None, 'message': ''}
-        if session.get('state') == 'connected' and not any(wireless and state == 'device' for _, _, state, wireless in devices):
+        if session.get('state') == 'connected' and not any(wireless and state == 'device' and
+                (not session.get('serial') or serial == session['serial']) for serial, _, state, wireless in devices):
             session = {**session, 'state': 'disconnected', 'message': 'The previous device is no longer connected. Check Wireless debugging on your phone, then reconnect with its current IP:port.'}
         snapshot = (devices, session)
         if getattr(self, 'adb_snapshot', None) == snapshot and self.adb_box.get_children():
@@ -718,7 +721,7 @@ class Panel(Gtk.ApplicationWindow):
         status = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         status.get_style_context().add_class('card-box')
         status.pack_start(label('Pair an Android device', 'section'), False, False, 0)
-        instructions = label(session['message'] or 'Enable Wireless debugging on your phone. Connect the phone and laptop to the same network, then start pairing.', 'subtitle')
+        instructions = label(session['message'] or 'Connect your phone and laptop to the same Wi-Fi. Scan the QR code from Wireless debugging to pair, connect, and open your screen.', 'subtitle')
         instructions.set_line_wrap(True)
         instructions.set_max_width_chars(46)
         status.pack_start(instructions, False, False, 0)
@@ -726,26 +729,28 @@ class Panel(Gtk.ApplicationWindow):
         pair.get_style_context().add_class('danger' if session['active'] else 'primary')
         pair.connect('clicked', lambda *_: self.adb_session.stop() if session['active'] else self.start_adb_pairing())
         status.pack_start(pair, False, False, 0)
-        alternatives = Gtk.Box(spacing=8)
-        for text, callback in [('Pair with code', backend.adb_pair), ('Connect IP:port', backend.adb_connect)]:
-            button = Gtk.Button(label=text)
-            button.set_sensitive(not session['active'])
-            button.connect('clicked', lambda _, cb=callback: self.perform(cb))
-            alternatives.pack_start(button, True, True, 0)
-        status.pack_start(alternatives, False, False, 0)
+        if session.get('state') in ('paired', 'timeout', 'error', 'disconnected'):
+            alternatives = Gtk.Box(spacing=8)
+            for text, callback in [('Pair with code', backend.adb_pair), ('Connect IP:port', backend.adb_connect)]:
+                button = Gtk.Button(label=text)
+                button.connect('clicked', lambda _, cb=callback: self.perform(cb))
+                alternatives.pack_start(button, True, True, 0)
+            status.pack_start(alternatives, False, False, 0)
         right.pack_start(status, False, False, 0)
 
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         card.get_style_context().add_class('card-box')
         card.pack_start(label('Connected devices', 'section'), False, False, 0)
+        card.pack_start(label('Click a connected device to open its screen.', 'subtitle'), False, False, 0)
         listing = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         listing.connect('row-activated', self.activate_row)
         for item in devices:
             serial, name, state, wireless = item
             description = {'device': 'Connected', 'offline': 'Offline', 'unauthorized': 'Waiting for approval on your phone'}.get(state, state)
             self.add_row(name, description + (' · Wireless' if wireless else ' · USB'), 'phone-symbolic',
-                         callback=lambda item=item: backend.adb_device_action(item),
-                         edit_callback=lambda item=item: backend.adb_rename_device(item), container=listing)
+                         callback=(lambda serial=serial: backend.start_scrcpy(serial)) if state == 'device' else None,
+                         disconnect_callback=(lambda serial=serial: backend.disconnect_adb_device(serial)) if wireless else None,
+                         container=listing)
         if devices:
             card.pack_start(listing, False, False, 0)
         else:

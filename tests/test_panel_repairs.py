@@ -17,6 +17,54 @@ def dns(name):
 
 
 class RepairsTest(unittest.TestCase):
+    def test_native_discovery_keeps_ipv4_when_ipv6_is_received_last(self):
+        from unittest.mock import Mock
+        owner = 'phone._adb-tls-connect._tcp.local'
+        records = [
+            ('_adb-tls-connect._tcp.local', 'ptr', owner, 120),
+            (owner, 'srv', ('phone.local', 41234), 120),
+            ('phone.local', 'addr', '192.168.1.7', 120),
+            ('phone.local', 'addr', 'fd00::7', 120),
+        ]
+        sock = Mock()
+        sock.recvfrom.return_value = (b'packet', ('192.168.1.7', 5353))
+        with patch.object(c.socket, 'socket', return_value=sock), \
+             patch.object(c, 'devices', return_value=[]), \
+             patch.object(c, 'parse_mdns_records', return_value=records), \
+             patch.object(c.time, 'monotonic', side_effect=[0, 0, 0, 0, 0, 0, 2, 2]):
+            services = c.native_adb_mdns({})
+        self.assertEqual(services, [('phone', '_adb-tls-connect._tcp', '192.168.1.7:41234')])
+
+    def test_qr_retries_a_transport_that_is_not_ready_after_pairing(self):
+        session = c.AdbQrSession()
+        services = [(session.service_name, '_adb-tls-pairing._tcp', '192.168.1.7:37123'),
+                    ('phone', '_adb-tls-connect._tcp', '192.168.1.7:41234')]
+        with patch.object(c, 'ensure_adb_discovery'), \
+             patch.object(c, 'adb_mdns_services', return_value=services), \
+             patch.object(c, 'adb_run', return_value='Successfully paired to device') as adb, \
+             patch.object(c, 'connect_adb_endpoint', side_effect=[RuntimeError('offline'), 'Phone']) as connect, \
+             patch.object(session.operation.cancelled, 'wait', return_value=False):
+            session.work()
+        self.assertEqual(session.snapshot()['state'], 'connected')
+        self.assertEqual(session.snapshot()['serial'], '192.168.1.7:41234')
+        self.assertEqual(connect.call_count, 2)
+        self.assertEqual(sum(call.args[0] == 'pair' for call in adb.call_args_list), 1)
+
+    def test_running_mirror_is_reused_without_spawning_a_duplicate(self):
+        with patch.object(c, 'verify_adb_ready', return_value='Phone'), \
+             patch.object(c, 'existing_scrcpy', return_value=1234), \
+             patch.object(c.shutil, 'which', return_value='/usr/bin/tool'), \
+             patch.object(c, 'run') as run, patch.object(c, 'notify'), \
+             patch.object(c.subprocess, 'Popen') as spawn:
+            c.start_scrcpy('192.168.1.7:41234')
+        spawn.assert_not_called()
+        self.assertIn('pid:1234', run.call_args.args[0][-1])
+
+    def test_disconnect_keeps_pairing_and_targets_only_the_selected_device(self):
+        with patch.object(c, 'adb_run') as adb, patch.object(c, 'notify') as notify:
+            c.disconnect_adb_device('192.168.1.7:41234')
+        adb.assert_called_once_with('disconnect', '192.168.1.7:41234', timeout=5)
+        self.assertIn('Pairing is saved', notify.call_args.args[0])
     def test_code_pairing_connects_only_the_paired_host_on_its_connection_port(self):
         services = [
             ('other-phone', '_adb-tls-connect._tcp', '192.168.1.8:41234'),
@@ -90,10 +138,12 @@ class RepairsTest(unittest.TestCase):
         from unittest.mock import Mock
         with tempfile.TemporaryDirectory() as folder:
             def launch(args, **kw):
+                self.assertTrue(kw['start_new_session'])
+                self.assertEqual(kw['stdin'], subprocess.DEVNULL)
                 kw['stdout'].write('ERROR: Could not connect to server\n')
                 kw['stdout'].flush()
                 return Mock(wait=Mock(return_value=1))
-            with patch.object(c, 'STATE_DIR', Path(folder)), patch.object(c, 'verify_adb_ready', return_value='Phone'), patch.object(c.shutil, 'which', return_value='/usr/bin/scrcpy'), patch.object(c.subprocess, 'Popen', side_effect=launch):
+            with patch.object(c, 'STATE_DIR', Path(folder)), patch.object(c, 'verify_adb_ready', return_value='Phone'), patch.object(c, 'existing_scrcpy', return_value=None), patch.object(c.shutil, 'which', return_value='/usr/bin/scrcpy'), patch.object(c.subprocess, 'Popen', side_effect=launch):
                 with self.assertRaisesRegex(RuntimeError, 'Could not connect to server'):
                     c.start_scrcpy('192.168.1.7:41234')
 
@@ -188,8 +238,9 @@ class RepairsTest(unittest.TestCase):
         services = [('another-phone', '_adb-tls-pairing._tcp', '192.168.1.8:30000'),
                     ('studio-' + 'a' * 10, '_adb-tls-pairing._tcp', '192.168.1.7:37123'),
                     ('adb-phone', '_adb-tls-connect._tcp', '192.168.1.7:41234')]
-        with patch.object(c, 'verify_adb_ready', return_value='Samsung A13'), patch.object(c, 'ensure_adb_discovery'), patch.object(c.shutil, 'which', return_value='/usr/bin/adb'), patch.object(c.secrets, 'token_hex', return_value='a' * 10), patch.object(c.threading, 'Thread', Worker), patch.object(c, 'show_qr', side_effect=display), patch.object(c, 'adb_mdns_services', return_value=services), patch.object(c, 'notify'), patch.object(c, 'adb_devices', return_value=[('192.168.1.7:41234', 'Phone', 'device', True)]), patch.object(c, 'adb_run', return_value='Successfully paired to device') as adb:
+        with patch.object(c, 'verify_adb_ready', return_value='Samsung A13'), patch.object(c, 'ensure_adb_discovery'), patch.object(c.shutil, 'which', return_value='/usr/bin/adb'), patch.object(c.secrets, 'token_hex', return_value='a' * 10), patch.object(c.threading, 'Thread', Worker), patch.object(c, 'show_qr', side_effect=display), patch.object(c, 'adb_mdns_services', return_value=services), patch.object(c, 'notify'), patch.object(c, 'adb_devices', return_value=[('192.168.1.7:41234', 'Phone', 'device', True)]), patch.object(c, 'adb_run', side_effect=lambda *args, **kw: 'Successfully paired to device' if args[0] == 'pair' else 'connected to 192.168.1.7:41234' if args[0] == 'connect' else '') as adb:
             c.adb_pair_qr()
+            self.assertEqual(workers[0].__self__.snapshot()['state'], 'connected')
             self.assertEqual([x.args for x in adb.call_args_list], [('start-server',), ('pair', '192.168.1.7:37123'), ('connect', '192.168.1.7:41234')])
 
     def test_concurrent_ap_requires_a_channel_allowed_by_driver(self):
