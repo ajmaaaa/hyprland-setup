@@ -241,6 +241,11 @@ The installer adds Downloads, Documents, Pictures, Videos, Projects, and Git
 to Dolphin/KDE Places and GTK 3/4 file chooser bookmarks. Existing custom
 shortcuts are kept; changed files are backed up. Run
 `python3 scripts/setup-places.py` to apply this to an existing install.
+Close Dolphin before running the script. Dolphin and GTK/KDE file dialogs
+default to modification time, newest first, including folders. Dolphin uses
+shared view settings; Network and Recent/search groups in KDE Places are hidden.
+Ark adds Extract actions to Dolphin, with ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ,
+TAR.ZST, 7Z, RAR, ARJ, LRZ, and LZO support through the installed backends.
 File upload/open/save dialogs float at 60% of the monitor width and height,
 centered on the monitor even above split windows, with an 85% size limit.
 

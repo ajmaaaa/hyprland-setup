@@ -34,7 +34,7 @@ class DesktopSetupTest(unittest.TestCase):
             f'<bookmark href="{download_uri}"><title>My downloads</title><info>'
             '<metadata owner="http://www.kde.org"><isHidden>true</isHidden>'
             '<OnlyInApp>other-app</OnlyInApp></metadata></info></bookmark></xbel>')
-        places.configure(self.home)
+        places.configure(self.home, apply_gsettings=False)
         root = ET.parse(kde).getroot()
         self.assertEqual(root.find('bookmark/title').text, 'Server')
         downloads = next(b for b in root.findall('bookmark') if b.get('href') == download_uri)
@@ -51,11 +51,39 @@ class DesktopSetupTest(unittest.TestCase):
         self.assertTrue(gtk.read_text().startswith('file:///custom Custom\n'))
         paths = [gtk, kde, self.home / '.config/gtk-4.0/bookmarks']
         before = {path: path.read_bytes() for path in paths}
-        places.configure(self.home)
+        places.configure(self.home, apply_gsettings=False)
         for path in paths:
             self.assertEqual(path.read_bytes(), before[path])
         self.assertEqual(len(list(gtk.parent.glob('bookmarks.backup-*'))), 1)
         self.assertEqual(len(list(kde.parent.glob('user-places.xbel.backup-*'))), 1)
+
+    def test_places_newest_first_and_hidden_groups_preserve_other_settings(self):
+        dolphin = self.home / '.config/dolphinrc'
+        dolphin.write_text('[General]\nGlobalViewProps=false\nSplitView=true\n[MainWindow]\nMenuBar=Disabled\n')
+        defaults = self.home / '.local/share/dolphin/view_properties/global/.directory'
+        defaults.parent.mkdir(parents=True)
+        defaults.write_text('[Dolphin]\nSortRole=text\nSortOrder=0\nViewMode=1\nZoomLevel=75\n')
+        places.configure(self.home, apply_gsettings=False)
+        self.assertEqual(viewers.read_ini(dolphin)['General']['GlobalViewProps'], 'true')
+        self.assertEqual(viewers.read_ini(dolphin)['General']['SplitView'], 'true')
+        self.assertEqual(viewers.read_ini(dolphin)['MainWindow']['MenuBar'], 'Disabled')
+        p = viewers.read_ini(defaults)
+        self.assertEqual(p['Dolphin']['SortRole'], 'modificationtime')
+        self.assertEqual(p['Dolphin']['SortOrder'], '1')
+        self.assertEqual(p['Dolphin']['SortFoldersFirst'], 'false')
+        self.assertEqual(p['Dolphin']['ViewMode'], '1')
+        self.assertEqual(p['Dolphin']['ZoomLevel'], '75')
+        p = viewers.read_ini(self.home / '.config/kdeglobals')
+        self.assertEqual(p['KFileDialog Settings']['Sort by'], 'Date')
+        self.assertEqual(p['KFileDialog Settings']['Sort reversed'], 'false')
+        root = ET.parse(self.home / '.local/share/user-places.xbel').getroot()
+        for group in ('Remote', 'SearchFor', 'RecentlySaved'):
+            self.assertEqual(root.find(f'info/metadata/GroupState-{group}-IsHidden').text, 'true')
+        self.assertEqual(root.find('info/metadata/GroupState-Places-IsHidden').text, 'false')
+        before = defaults.read_bytes()
+        places.configure(self.home, apply_gsettings=False)
+        self.assertEqual(defaults.read_bytes(), before)
+        self.assertEqual(len(list(defaults.parent.glob('.directory.backup-*'))), 1)
 
     def test_zen_default_is_false_and_preserves_other_browser_settings(self):
         with tempfile.TemporaryDirectory() as folder:

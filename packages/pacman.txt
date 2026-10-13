@@ -65,6 +65,12 @@ python-zeroconf
 # =========================
 
 dolphin
+ark
+arj
+lrzip
+lzop
+unarchiver
+unrar
 gvfs
 
 # =========================
