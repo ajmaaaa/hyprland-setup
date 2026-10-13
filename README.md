@@ -242,8 +242,11 @@ to Dolphin/KDE Places and GTK 3/4 file chooser bookmarks. Existing custom
 shortcuts are kept; changed files are backed up. Run
 `python3 scripts/setup-places.py` to apply this to an existing install.
 Close Dolphin before running the script. Dolphin and GTK/KDE file dialogs
-default to modification time, newest first, including folders. Dolphin uses
-shared view settings; Network and Recent/search groups in KDE Places are hidden.
+default to modification time, newest first, including folders. Dolphin defaults
+to Details view with Name, Size, and Modified columns and uses
+shared view settings; only the generic Network shortcut and Recent/search groups
+in KDE Places are hidden. Remote locations, devices, and removable devices stay
+visible so connected phone storage and network mounts can still appear.
 Ark adds Extract actions to Dolphin, with ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ,
 TAR.ZST, 7Z, RAR, ARJ, LRZ, and LZO support through the installed backends.
 File upload/open/save dialogs float at 60% of the monitor width and height,

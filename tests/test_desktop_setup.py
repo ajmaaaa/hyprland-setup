@@ -62,7 +62,7 @@ class DesktopSetupTest(unittest.TestCase):
         dolphin.write_text('[General]\nGlobalViewProps=false\nSplitView=true\n[MainWindow]\nMenuBar=Disabled\n')
         defaults = self.home / '.local/share/dolphin/view_properties/global/.directory'
         defaults.parent.mkdir(parents=True)
-        defaults.write_text('[Dolphin]\nSortRole=text\nSortOrder=0\nViewMode=1\nZoomLevel=75\n')
+        defaults.write_text('[Dolphin]\nSortRole=text\nSortOrder=0\nViewMode=0\nZoomLevel=75\n')
         places.configure(self.home, apply_gsettings=False)
         self.assertEqual(viewers.read_ini(dolphin)['General']['GlobalViewProps'], 'true')
         self.assertEqual(viewers.read_ini(dolphin)['General']['SplitView'], 'true')
@@ -72,14 +72,18 @@ class DesktopSetupTest(unittest.TestCase):
         self.assertEqual(p['Dolphin']['SortOrder'], '1')
         self.assertEqual(p['Dolphin']['SortFoldersFirst'], 'false')
         self.assertEqual(p['Dolphin']['ViewMode'], '1')
+        self.assertEqual(p['Dolphin']['VisibleRoles'], 'Details_size,Details_modificationtime')
         self.assertEqual(p['Dolphin']['ZoomLevel'], '75')
         p = viewers.read_ini(self.home / '.config/kdeglobals')
         self.assertEqual(p['KFileDialog Settings']['Sort by'], 'Date')
         self.assertEqual(p['KFileDialog Settings']['Sort reversed'], 'false')
         root = ET.parse(self.home / '.local/share/user-places.xbel').getroot()
-        for group in ('Remote', 'SearchFor', 'RecentlySaved'):
+        for group in ('SearchFor', 'RecentlySaved'):
             self.assertEqual(root.find(f'info/metadata/GroupState-{group}-IsHidden').text, 'true')
-        self.assertEqual(root.find('info/metadata/GroupState-Places-IsHidden').text, 'false')
+        for group in ('Places', 'Remote', 'Devices', 'RemovableDevices'):
+            self.assertEqual(root.find(f'info/metadata/GroupState-{group}-IsHidden').text, 'false')
+        network = next(b for b in root.findall('bookmark') if b.get('href') == 'remote:/')
+        self.assertEqual(network.find('info/metadata/isHidden').text, 'true')
         before = defaults.read_bytes()
         places.configure(self.home, apply_gsettings=False)
         self.assertEqual(defaults.read_bytes(), before)

@@ -57,7 +57,8 @@ def configure_sorting(home, apply_gsettings):
     merge_ini(home / '.config/dolphinrc', {'General': {'GlobalViewProps': 'true'}})
     merge_ini(home / '.local/share/dolphin/view_properties/global/.directory', {
         'Dolphin': {'Version': '4', 'SortRole': 'modificationtime',
-            'SortOrder': '1', 'SortFoldersFirst': 'false'},
+            'SortOrder': '1', 'SortFoldersFirst': 'false', 'ViewMode': '1',
+            'VisibleRoles': 'Details_size,Details_modificationtime'},
     })
     # KIO uses QDir::Time: newest first unless QDir::Reversed is set.
     merge_ini(home / '.config/kdeglobals', {'KFileDialog Settings': {
@@ -92,7 +93,7 @@ def configure(home, apply_gsettings=True):
     path = home / '.local/share/user-places.xbel'
     root = ET.parse(path).getroot() if path.exists() else ET.Element('xbel', {'version': '1.0'})
     before = ET.tostring(root)
-    for uri, name, icon in entries:
+    for uri, name, icon in entries + [('remote:/', 'Network', 'folder-network')]:
         bookmark = next((b for b in root.findall('bookmark') if b.get('href') == uri), None)
         if bookmark is None:
             bookmark = ET.SubElement(root, 'bookmark', {'href': uri})
@@ -109,13 +110,25 @@ def configure(home, apply_gsettings=True):
                     metadata.remove(child)
                 elif child.tag == 'isHidden':
                     child.text = 'false'
+        if uri == 'remote:/':
+            info = bookmark.find('info')
+            if info is None:
+                info = ET.SubElement(bookmark, 'info')
+            metadata = next((m for m in info.findall('metadata') if m.get('owner') == 'http://www.kde.org'), None)
+            if metadata is None:
+                metadata = ET.SubElement(info, 'metadata', {'owner': 'http://www.kde.org'})
+            hidden = metadata.find('isHidden')
+            if hidden is None:
+                hidden = ET.SubElement(metadata, 'isHidden')
+            hidden.text = 'true'
     info = root.find('info')
     if info is None:
         info = ET.SubElement(root, 'info')
     metadata = next((m for m in info.findall('metadata') if m.get('owner') == 'http://www.kde.org'), None)
     if metadata is None:
         metadata = ET.SubElement(info, 'metadata', {'owner': 'http://www.kde.org'})
-    for group, hidden in (('Places', 'false'), ('Remote', 'true'),
+    for group, hidden in (('Places', 'false'), ('Remote', 'false'),
+            ('Devices', 'false'), ('RemovableDevices', 'false'),
             ('SearchFor', 'true'), ('RecentlySaved', 'true')):
         tag = f'GroupState-{group}-IsHidden'
         node = metadata.find(tag)
