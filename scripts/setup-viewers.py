@@ -51,6 +51,8 @@ def configure(home, system_apps=Path('/usr/share/applications'), refresh=True):
     available = lambda name: (system_apps / name).is_file()
     has_editor = available('antigravity-ide.desktop')
     has_nvim = available('nvim.desktop') and available('Alacritty.desktop')
+    has_micro = available('micro.desktop') and available('Alacritty.desktop')
+    notes = {'text/plain', 'text/markdown', 'text/x-markdown'}
     if has_editor:
         desktop = read_ini(system_apps / 'antigravity-ide.desktop')
         desktop['Desktop Entry']['MimeType'] = ';'.join(sorted(code | supported('antigravity-ide.desktop'))) + ';'
@@ -62,21 +64,18 @@ def configure(home, system_apps=Path('/usr/share/applications'), refresh=True):
 
     expected = {}
     alternatives = {}
-    if has_editor:
-        expected.update(dict.fromkeys(code, 'antigravity-ide.desktop'))
     if has_nvim:
-        alternatives.update({mime: ['nvim.desktop'] for mime in code})
-    # Notes open in a small GUI editor, even when an IDE is installed.
-    text_editor = 'org.xfce.mousepad.desktop'
-    if available(text_editor):
-        notes = {'text/plain', 'text/markdown', 'text/x-markdown'}
-        desktop = read_ini(system_apps / text_editor)
-        desktop['Desktop Entry']['MimeType'] = ';'.join(sorted(notes | supported(text_editor))) + ';'
-        write(apps / text_editor, serialize(desktop))
-        expected.update(dict.fromkeys(notes, text_editor))
-        if has_editor:
+        expected.update(dict.fromkeys(code | notes, 'nvim.desktop'))
+    if has_editor:
+        alternatives.update({mime: ['antigravity-ide.desktop'] for mime in code | notes})
+    if has_micro:
+        write(apps / 'micro.desktop', '[Desktop Entry]\nName=Micro (Alacritty)\nType=Application\n'
+              'Exec=alacritty -e micro -- %F\nTryExec=micro\nIcon=micro\nTerminal=false\n'
+              'Categories=Utility;TextEditor;\nMimeType=' + ';'.join(sorted(notes)) + ';\n')
+        expected.update(dict.fromkeys(notes, 'micro.desktop'))
+        if has_nvim:
             for mime in notes:
-                alternatives.setdefault(mime, []).insert(0, 'antigravity-ide.desktop')
+                alternatives.setdefault(mime, []).insert(0, 'nvim.desktop')
     for name, predicate in (
         ('mpv.desktop', lambda m: m.startswith(('audio/', 'video/')) or m in {
             'application/ogg', 'application/x-ogg', 'application/x-matroska',

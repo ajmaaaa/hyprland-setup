@@ -65,7 +65,6 @@ python-zeroconf
 # =========================
 
 dolphin
-mousepad
 ark
 arj
 lrzip

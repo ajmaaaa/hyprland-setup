@@ -12,7 +12,7 @@ Simple automated Arch Linux setup using:
 - hypridle + hyprlock
 - Quickshell workspace previews
 - Papers (PDF), Loupe (images), mpv (video/audio)
-- Mousepad (plain text and Markdown)
+- Micro (plain text and Markdown), Neovim (source code)
 
 ---
 
@@ -143,8 +143,8 @@ override this factory default. Other browser defaults and policies are retained.
 | PDF | Papers | Existing choices are retained |
 | Images supported by Loupe | Loupe | Existing choices are retained |
 | Audio/video supported by mpv | mpv | Existing choices are retained |
-| Plain text (`.txt`), Markdown (`.md`) | Mousepad | Antigravity IDE and Neovim (when installed) |
-| Source code, JSON, YAML, local HTML | Antigravity IDE | Neovim (Alacritty) |
+| Plain text (`.txt`), Markdown (`.md`) | Micro (Alacritty) | Neovim and Antigravity IDE (when installed) |
+| Source code, JSON, YAML, local HTML | Neovim (Alacritty) | Antigravity IDE (when installed) |
 
 The installer merges MIME associations, registers the editor launchers, and
 refreshes the desktop databases for Dolphin and other apps. Web links keep their
@@ -153,9 +153,10 @@ in Zen, set Settings → General → Applications → PDF to use the system defa
 if you also want PDF downloads to open externally. This installer does not edit
 browser profiles or disable embedded web viewers.
 
-Mousepad is included in the recommended Pacman packages. It opens Markdown as
-editable plain text. Its default layout hides the toolbar, status bar, and line
-numbers, suitable for simple notes. Dolphin double-click uses these associations.
+Micro and Neovim are included in the recommended Pacman packages. Their desktop
+launchers open an Alacritty terminal when a file is double-clicked in Dolphin.
+Micro opens Markdown as editable text. Associations are applied only when the
+editor and Alacritty are installed.
 
 To reapply associations after installing a previously skipped viewer:
 

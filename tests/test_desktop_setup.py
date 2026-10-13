@@ -140,8 +140,8 @@ class DesktopSetupTest(unittest.TestCase):
         p = viewers.read_ini(path)
         self.assertEqual(p['Default Applications']['application/zip'], 'archive.desktop;')
         self.assertEqual(p['Default Applications']['x-scheme-handler/https'], 'browser.desktop;')
-        self.assertEqual(p['Default Applications']['text/plain'], 'antigravity-ide.desktop;')
-        self.assertEqual(p['Added Associations']['text/plain'], 'antigravity-ide.desktop;nvim.desktop;other.desktop;')
+        self.assertEqual(p['Default Applications']['text/plain'], 'nvim.desktop;')
+        self.assertEqual(p['Added Associations']['text/plain'], 'nvim.desktop;antigravity-ide.desktop;other.desktop;')
         self.assertEqual(p['Removed Associations']['text/plain'], 'blocked.desktop;')
         self.assertEqual(expected['application/pdf'], 'org.gnome.Papers.desktop')
         self.assertEqual(expected['image/png'], 'org.gnome.Loupe.desktop')
@@ -159,15 +159,15 @@ class DesktopSetupTest(unittest.TestCase):
         path = self.home / '.config/mimeapps.list'
         path.write_text('[Default Applications]\napplication/pdf=existing.desktop;\ntext/plain=existing.desktop;\n')
         self.app('nvim.desktop')
-        self.app('Alacritty.desktop')
+        self.app('micro.desktop')
         self.assertEqual(viewers.configure(self.home, self.apps, False), {})
         p = viewers.read_ini(path)
         self.assertEqual(p['Default Applications']['application/pdf'], 'existing.desktop;')
         self.assertEqual(p['Default Applications']['text/plain'], 'existing.desktop;')
-        self.assertEqual(p['Added Associations']['text/plain'], 'nvim.desktop;')
+        self.assertNotIn('text/plain', p['Added Associations'])
 
-    def test_mousepad_opens_notes_while_code_keeps_ide_and_open_with_choices(self):
-        self.app('org.xfce.mousepad.desktop', 'text/plain;')
+    def test_micro_opens_notes_while_nvim_opens_code_and_keeps_open_with_choices(self):
+        self.app('micro.desktop', 'text/plain;')
         self.app('antigravity-ide.desktop', 'text/x-python;')
         self.app('nvim.desktop')
         self.app('Alacritty.desktop')
@@ -176,23 +176,27 @@ class DesktopSetupTest(unittest.TestCase):
             '[Added Associations]\ntext/plain=custom.desktop;\n')
         expected = viewers.configure(self.home, self.apps, False)
         for mime in ('text/plain', 'text/markdown', 'text/x-markdown'):
-            self.assertEqual(expected[mime], 'org.xfce.mousepad.desktop')
-        self.assertEqual(expected['text/x-python'], 'antigravity-ide.desktop')
+            self.assertEqual(expected[mime], 'micro.desktop')
+        self.assertEqual(expected['text/x-python'], 'nvim.desktop')
         for path in (specific, self.home / '.config/mimeapps.list'):
             p = viewers.read_ini(path)
-            self.assertEqual(p['Default Applications']['text/plain'], 'org.xfce.mousepad.desktop;')
+            self.assertEqual(p['Default Applications']['text/plain'], 'micro.desktop;')
             self.assertIn('antigravity-ide.desktop;', p['Added Associations']['text/plain'])
             self.assertIn('nvim.desktop;', p['Added Associations']['text/plain'])
         self.assertIn('custom.desktop;', viewers.read_ini(specific)['Added Associations']['text/plain'])
-        desktop = viewers.read_ini(self.home / '.local/share/applications/org.xfce.mousepad.desktop')
+        desktop = viewers.read_ini(self.home / '.local/share/applications/micro.desktop')
         self.assertIn('text/markdown;', desktop['Desktop Entry']['MimeType'])
-        self.assertEqual(desktop['Desktop Entry']['Exec'], 'example %F')
+        self.assertEqual(desktop['Desktop Entry']['Exec'], 'alacritty -e micro -- %F')
+        self.assertEqual(desktop['Desktop Entry']['Terminal'], 'false')
+        desktop = viewers.read_ini(self.home / '.local/share/applications/nvim.desktop')
+        self.assertEqual(desktop['Desktop Entry']['Exec'], 'alacritty -e nvim -- %F')
 
-    def test_mousepad_notes_work_without_an_ide(self):
-        self.app('org.xfce.mousepad.desktop', 'text/plain;')
+    def test_micro_notes_work_without_an_ide(self):
+        self.app('micro.desktop', 'text/plain;')
+        self.app('Alacritty.desktop')
         expected = viewers.configure(self.home, self.apps, False)
-        self.assertEqual(expected['text/plain'], 'org.xfce.mousepad.desktop')
-        self.assertEqual(expected['text/markdown'], 'org.xfce.mousepad.desktop')
+        self.assertEqual(expected['text/plain'], 'micro.desktop')
+        self.assertEqual(expected['text/markdown'], 'micro.desktop')
         self.assertNotIn('text/x-python', expected)
 
     def test_obs_fresh_install_and_existing_profile(self):
